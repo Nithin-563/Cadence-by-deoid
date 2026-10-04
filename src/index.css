@@ -3,6 +3,43 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+
+  --animate-marquee: marquee 42s linear infinite;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-drift: drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(4%, -5%, 0) scale(1.12);
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -47,6 +84,23 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* Brand ramp — warm ember to amber, with a deep teal counterpoint. */
+  --color-ember-50: var(--ember-50);
+  --color-ember-100: var(--ember-100);
+  --color-ember-200: var(--ember-200);
+  --color-ember-300: var(--ember-300);
+  --color-ember-400: var(--ember-400);
+  --color-ember-500: var(--ember-500);
+  --color-ember-600: var(--ember-600);
+  --color-ember-700: var(--ember-700);
+  --color-gold-300: var(--gold-300);
+  --color-gold-400: var(--gold-400);
+  --color-gold-500: var(--gold-500);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -84,95 +138,137 @@
 }
 
 :root {
-  --radius: 0.75rem;
+  --radius: 0.875rem;
 
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(222.2 84% 4.9%);
+  /* Warm paper canvas + warm ink text. */
+  --background: hsl(38 34% 97%);
+  --foreground: hsl(24 20% 10%);
 
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222.2 84% 4.9%);
+  --card: hsl(36 44% 99%);
+  --card-foreground: hsl(24 20% 10%);
 
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222.2 84% 4.9%);
+  --popover: hsl(36 44% 99%);
+  --popover-foreground: hsl(24 20% 10%);
 
-  --primary: hsl(222.2 47.4% 11.2%);
-  --primary-foreground: hsl(210 40% 98%);
+  --primary: hsl(14 78% 45%);
+  --primary-foreground: hsl(38 40% 98%);
 
-  --secondary: hsl(210 40% 96.1%);
-  --secondary-foreground: hsl(222.2 47.4% 11.2%);
+  --secondary: hsl(34 32% 92%);
+  --secondary-foreground: hsl(24 22% 14%);
 
-  --muted: hsl(210 40% 96.1%);
-  --muted-foreground: hsl(215.4 16.3% 46.9%);
+  --muted: hsl(34 26% 93%);
+  --muted-foreground: hsl(26 10% 42%);
 
-  --accent: hsl(210 40% 96.1%);
-  --accent-foreground: hsl(222.2 47.4% 11.2%);
+  --accent: hsl(34 34% 91%);
+  --accent-foreground: hsl(24 22% 14%);
 
-  --destructive: hsl(0 84.2% 60.2%);
-  --destructive-foreground: hsl(210 40% 98%);
+  --destructive: hsl(0 72% 45%);
+  --destructive-foreground: hsl(0 0% 100%);
 
-  --border: hsl(214.3 31.8% 91.4%);
-  --input: hsl(214.3 31.8% 91.4%);
-  --ring: hsl(222.2 84% 4.9%);
+  --border: hsl(32 22% 87%);
+  --input: hsl(32 22% 87%);
+  --ring: hsl(14 78% 45%);
 
-  --chart-1: hsl(12 76% 61%);
-  --chart-2: hsl(173 58% 39%);
-  --chart-3: hsl(197 37% 24%);
-  --chart-4: hsl(43 74% 66%);
-  --chart-5: hsl(27 87% 67%);
+  --chart-1: hsl(14 78% 52%);
+  --chart-2: hsl(40 92% 56%);
+  --chart-3: hsl(186 62% 34%);
+  --chart-4: hsl(258 58% 58%);
+  --chart-5: hsl(24 22% 38%);
 
-  --sidebar: hsl(0 0% 98%);
-  --sidebar-foreground: hsl(240 5.3% 26.1%);
-  --sidebar-primary: hsl(240 5.9% 10%);
-  --sidebar-primary-foreground: hsl(0 0% 98%);
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(240 5.9% 10%);
-  --sidebar-border: hsl(220 13% 91%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --sidebar: hsl(36 40% 98%);
+  --sidebar-foreground: hsl(24 20% 14%);
+  --sidebar-primary: hsl(14 78% 45%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(34 30% 93%);
+  --sidebar-accent-foreground: hsl(24 22% 14%);
+  --sidebar-border: hsl(32 22% 87%);
+  --sidebar-ring: hsl(14 78% 45%);
+
+  /* Brand ramp */
+  --ember-50: hsl(20 92% 95%);
+  --ember-100: hsl(18 90% 90%);
+  --ember-200: hsl(16 88% 81%);
+  --ember-300: hsl(15 84% 68%);
+  --ember-400: hsl(14 82% 57%);
+  --ember-500: hsl(14 78% 49%);
+  --ember-600: hsl(14 78% 43%);
+  --ember-700: hsl(15 76% 34%);
+
+  --gold-300: hsl(44 96% 68%);
+  --gold-400: hsl(42 94% 60%);
+  --gold-500: hsl(38 90% 51%);
+
+  --teal: hsl(186 64% 29%);
+  --teal-soft: hsl(178 42% 92%);
+
+  /* Always-dark surface, used for high-emphasis callouts in both modes. */
+  --panel: hsl(24 24% 9%);
+  --panel-foreground: hsl(38 30% 96%);
 }
 
 .dark {
-  --background: hsl(222.2 84% 4.9%);
-  --foreground: hsl(210 40% 98%);
+  --background: hsl(24 16% 6%);
+  --foreground: hsl(38 28% 94%);
 
-  --card: hsl(222.2 84% 4.9%);
-  --card-foreground: hsl(210 40% 98%);
+  --card: hsl(24 14% 9%);
+  --card-foreground: hsl(38 28% 94%);
 
-  --popover: hsl(222.2 84% 4.9%);
-  --popover-foreground: hsl(210 40% 98%);
+  --popover: hsl(24 14% 9%);
+  --popover-foreground: hsl(38 28% 94%);
 
-  --primary: hsl(210 40% 98%);
-  --primary-foreground: hsl(222.2 47.4% 11.2%);
+  --primary: hsl(16 88% 60%);
+  --primary-foreground: hsl(24 30% 8%);
 
-  --secondary: hsl(217.2 32.6% 17.5%);
-  --secondary-foreground: hsl(210 40% 98%);
+  --secondary: hsl(24 10% 16%);
+  --secondary-foreground: hsl(38 28% 94%);
 
-  --muted: hsl(217.2 32.6% 17.5%);
-  --muted-foreground: hsl(215 20.2% 65.1%);
+  --muted: hsl(24 10% 15%);
+  --muted-foreground: hsl(34 12% 65%);
 
-  --accent: hsl(217.2 32.6% 17.5%);
-  --accent-foreground: hsl(210 40% 98%);
+  --accent: hsl(24 10% 17%);
+  --accent-foreground: hsl(38 28% 94%);
 
-  --destructive: hsl(0 62.8% 30.6%);
-  --destructive-foreground: hsl(210 40% 98%);
+  --destructive: hsl(0 66% 52%);
+  --destructive-foreground: hsl(0 0% 100%);
 
-  --border: hsl(217.2 32.6% 17.5%);
-  --input: hsl(217.2 32.6% 17.5%);
-  --ring: hsl(212.7 26.8% 83.9%);
+  --border: hsl(26 10% 21%);
+  --input: hsl(26 10% 21%);
+  --ring: hsl(16 88% 60%);
 
-  --chart-1: hsl(220 70% 50%);
-  --chart-2: hsl(160 60% 45%);
-  --chart-3: hsl(30 80% 55%);
-  --chart-4: hsl(280 65% 60%);
-  --chart-5: hsl(340 75% 55%);
+  --chart-1: hsl(16 88% 60%);
+  --chart-2: hsl(42 90% 60%);
+  --chart-3: hsl(178 56% 52%);
+  --chart-4: hsl(258 78% 72%);
+  --chart-5: hsl(34 20% 70%);
 
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --sidebar: hsl(24 14% 9%);
+  --sidebar-foreground: hsl(38 28% 94%);
+  --sidebar-primary: hsl(16 88% 60%);
+  --sidebar-primary-foreground: hsl(24 30% 8%);
+  --sidebar-accent: hsl(24 10% 16%);
+  --sidebar-accent-foreground: hsl(38 28% 94%);
+  --sidebar-border: hsl(26 10% 21%);
+  --sidebar-ring: hsl(16 88% 60%);
+
+  /* Brand ramp */
+  --ember-50: hsl(24 18% 14%);
+  --ember-100: hsl(24 20% 18%);
+  --ember-200: hsl(20 40% 26%);
+  --ember-300: hsl(16 72% 44%);
+  --ember-400: hsl(16 84% 54%);
+  --ember-500: hsl(16 88% 60%);
+  --ember-600: hsl(16 84% 66%);
+  --ember-700: hsl(18 82% 74%);
+
+  --gold-300: hsl(42 82% 56%);
+  --gold-400: hsl(42 88% 62%);
+  --gold-500: hsl(40 90% 68%);
+
+  --teal: hsl(178 52% 52%);
+  --teal-soft: hsl(182 30% 16%);
+
+  --panel: hsl(24 18% 7%);
+  --panel-foreground: hsl(38 28% 94%);
 }
 
 @layer base {
@@ -184,7 +280,27 @@
     border-color: var(--color-border, currentcolor);
   }
 
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 6rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    font-variation-settings: normal;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 }

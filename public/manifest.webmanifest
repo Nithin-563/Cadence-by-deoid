@@ -1,0 +1,18 @@
+{
+  "name": "Cadence — Customer intelligence for product teams",
+  "short_name": "Cadence",
+  "description": "Pull customer feedback from every channel and turn it into prioritised, evidence-backed roadmap decisions.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#c33e1b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

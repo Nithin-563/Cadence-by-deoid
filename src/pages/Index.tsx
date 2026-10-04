@@ -1,23 +1,50 @@
-import { useSeoMeta } from '@unhead/react';
+import { useSeoMeta } from "@unhead/react";
 
-// FIXME: Update this page (the content is just a fallback if you fail to update the page)
+import { Nav } from "@/components/landing/Nav";
+import { Hero } from "@/components/landing/Hero";
+import { LogoCloud } from "@/components/landing/LogoCloud";
+import { Features } from "@/components/landing/Features";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { Testimonials } from "@/components/landing/Testimonials";
+import { Pricing } from "@/components/landing/Pricing";
+import { Faq } from "@/components/landing/Faq";
+import { FinalCta, Footer } from "@/components/landing/Footer";
 
 const Index = () => {
   useSeoMeta({
-    title: 'Welcome to Your Blank App',
-    description: 'A modern Nostr client application built with React, TailwindCSS, and Nostrify.',
+    title: "Cadence — Stop guessing what to build next",
+    description:
+      "Cadence pulls customer feedback from support, calls, surveys and Slack, then turns it into prioritised, evidence-backed roadmap decisions your whole team can trust.",
+    ogTitle: "Cadence — Stop guessing what to build next",
+    ogDescription:
+      "The customer intelligence platform for teams that would rather ship the right thing than the loudest thing.",
+    ogType: "website",
+    twitterCard: "summary_large_image",
   });
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 text-gray-900 dark:text-gray-100">
-          Welcome to Your Blank App
-        </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-400">
-          Start building your amazing project here!
-        </p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[60] focus:rounded-full focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
+      >
+        Skip to content
+      </a>
+
+      <Nav />
+
+      <main id="main">
+        <Hero />
+        <LogoCloud />
+        <Features />
+        <HowItWorks />
+        <Testimonials />
+        <Pricing />
+        <Faq />
+        <FinalCta />
+      </main>
+
+      <Footer />
     </div>
   );
 };
