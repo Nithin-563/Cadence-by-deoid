@@ -41,6 +41,18 @@ Site settings → Environment variables → add:
 Then redeploy. No other configuration is needed — the app is fully static and
 talks to Supabase directly.
 
+> **Note on the committed defaults**
+> `src/lib/supabase.ts` ships this project's URL and anon key as fallback
+> defaults, so the app runs in any preview without extra setup. The Supabase
+> anon key is a *publishable* key by design — it is not a secret, and RLS is
+> what actually protects your data. Environment variables always take
+> precedence, so you can point the app at a different project without touching
+> the code.
+>
+> If Supabase ever returns `Invalid API key`, the key has been rotated: copy
+> the current one from **Settings → API** and update `VITE_SUPABASE_ANON_KEY`
+> (and the fallback constant).
+
 ## 3. Auth settings
 
 By default Supabase may require email confirmation. To make local testing
@@ -96,8 +108,8 @@ src/hooks/useAuth.tsx        session + profile context
 src/hooks/useCadenceData.ts  servers, channels, members, DMs
 src/hooks/useMessages.ts     message history + realtime
 src/hooks/usePresence.ts     presence and typing indicators
-src/components/app/          the three-pane app shell
-src/components/landing/      the marketing site
+src/components/app/          the app shell
+src/components/landing/      the marketing site at /
 ```
 
 ## Not built yet

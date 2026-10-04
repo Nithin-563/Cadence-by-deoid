@@ -18,11 +18,11 @@ export function FinalCta() {
             </div>
 
             <h2 className="mx-auto max-w-3xl text-balance text-3xl font-semibold tracking-tight sm:text-5xl md:text-[3.5rem] md:leading-[1.05]">
-              Your customers already told you what to build.
+              Where your people already are.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-pretty text-base leading-relaxed text-panel-foreground/70 sm:text-lg">
-              Connect one source, see your ranked backlog in an hour, and never argue about whose
-              anecdote wins again.
+              Servers, channels, roles and DMs — with messages that arrive before you finish
+              sending them.
             </p>
 
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -42,7 +42,7 @@ export function FinalCta() {
             </div>
 
             <p className="mt-6 text-sm text-panel-foreground/55">
-              Free 14-day trial · No credit card · Cancel in one click
+              Free forever · No credit card · Bring your own Supabase project
             </p>
           </div>
         </Reveal>
@@ -54,15 +54,15 @@ export function FinalCta() {
 const FOOTER_COLUMNS = [
   {
     title: "Product",
-    links: ["Features", "Integrations", "Changelog", "Roadmap", "Pricing"],
+    links: ["Features", "Pricing", "Changelog", "Roadmap", "Status"],
   },
   {
-    title: "Company",
-    links: ["About", "Customers", "Careers", "Blog", "Press kit"],
+    title: "Community",
+    links: ["Find people", "Create a server", "Invites", "Moderation", "Guidelines"],
   },
   {
     title: "Resources",
-    links: ["Documentation", "API reference", "Help centre", "Status", "Community"],
+    links: ["Documentation", "SQL schema", "Self-hosting", "Help centre", "Examples"],
   },
   {
     title: "Legal",
@@ -78,8 +78,8 @@ export function Footer() {
           <div className="max-w-sm">
             <Logo />
             <p className="mt-4 text-pretty text-sm leading-relaxed text-muted-foreground">
-              The customer intelligence platform for teams that would rather ship the right thing
-              than the loudest thing.
+              A Discord-style chat app with servers, channels, roles and DMs — open source and
+              powered by Supabase.
             </p>
             <div className="mt-6 flex items-center gap-2">
               {[

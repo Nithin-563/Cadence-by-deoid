@@ -8,48 +8,47 @@ type Testimonial = {
   name: string;
   role: string;
   initials: string;
-  /** Two-stop gradient for the avatar tile. */
   tone: string;
   metric?: { value: string; label: string };
 };
 
 const FEATURED: Testimonial = {
   quote:
-    "We killed three roadmap spreadsheets in the first month. The part nobody expects is the closed loop — customers started telling us they'd seen their own words in a changelog, and our NPS moved 14 points in a quarter.",
+    "We moved 400 people off a legacy chat tool in a weekend. The part that surprised me is the permission model — I set up a read-only channel for the whole support org in about two minutes, without filing a ticket with anyone.",
   name: "Priya Raghunathan",
-  role: "VP Product, Northwind",
+  role: "Community lead, Design Guild",
   initials: "PR",
   tone: "from-ember-500 to-gold-400",
-  metric: { value: "+14 pts", label: "NPS in one quarter" },
+  metric: { value: "400", label: "Members moved" },
 };
 
 const REST: Testimonial[] = [
   {
     quote:
-      "Our last roadmap review used to take two weeks of prep. Now it's a Tuesday meeting with a ranked list that's already been through finance.",
+      "Messages show up instantly. I genuinely cannot tell the difference from the app I used before, except I can read the SQL for all of it.",
     name: "Marcus Adeyemi",
-    role: "Head of Product, Halo Labs",
+    role: "Maintainer, Open Source",
     initials: "MA",
     tone: "from-teal to-ember-400",
-    metric: { value: "−6 days", label: "Planning cycle" },
+    metric: { value: "< 100 ms", label: "Typical delivery" },
   },
   {
     quote:
-      "The revenue-at-risk scoring was the unlock. Support told us an export feature was annoying. Cadence showed us it was $412k of ARR.",
+      "Running it on our own Supabase project meant our compliance team had nothing left to review. The data never goes anywhere else.",
     name: "Sofia Lindqvist",
-    role: "CPO, Meridian",
+    role: "Engineering lead, Meridian",
     initials: "SL",
     tone: "from-gold-400 to-ember-500",
-    metric: { value: "$412k", label: "ARR surfaced" },
+    metric: { value: "1", label: "Vendor to audit" },
   },
   {
     quote:
-      "We run support in three languages. Cadence translated, clustered and still pointed back to the original recording every single time.",
+      "The friend requests and DM flows took the pressure off our shared inbox. People talk to each other now instead of pinging one person to ask a question.",
     name: "Tomás Herrera",
-    role: "Director of CX, Tidewater",
+    role: "Community manager, Game Night",
     initials: "TH",
     tone: "from-ember-600 to-teal",
-    metric: { value: "3.1×", label: "Tickets triaged" },
+    metric: { value: "0", label: "Single points of contact" },
   },
 ];
 
@@ -73,14 +72,13 @@ export function Testimonials() {
       <Container wide>
         <Reveal>
           <SectionHeading
-            eyebrow="Customers"
-            title="Teams ship faster when they stop guessing"
-            lede="From seed-stage startups to public companies — here is what changes once the whole company can see the same signal."
+            eyebrow="In use"
+            title="Communities that moved and stayed"
+            lede="From small hobby groups to open-source projects with hundreds of members — here's what people run on Cadence."
           />
         </Reveal>
 
         <div className="mt-14 grid gap-5 sm:mt-16 lg:grid-cols-2">
-          {/* Featured quote */}
           <Reveal className="lg:col-span-2">
             <figure className="relative flex h-full flex-col justify-between gap-8 overflow-hidden rounded-2xl border border-border/70 bg-linear-to-br from-ember-500/10 via-card to-gold-400/10 p-7 sm:p-10">
               <div

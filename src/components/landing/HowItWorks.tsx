@@ -1,36 +1,37 @@
-import { Cable, Radar, Rocket } from "lucide-react";
+import { Link } from "react-router-dom";
+import { KeyRound, MessageSquarePlus, UserPlus } from "lucide-react";
 
 import { Container, Reveal, Section, SectionHeading } from "@/components/landing/primitives";
 
 const STEPS = [
   {
-    icon: Cable,
+    icon: UserPlus,
     step: "01",
-    title: "Connect everything",
-    body: "Plug in your support tool, call recorder, survey platform and community. Import 90 days of history in one click, or stream events to our API as they happen.",
-    detail: "Setup takes about four minutes. No data engineer required.",
+    title: "Make an account",
+    body: "Email and password, or Google. Pick a username — it becomes how people find you in the directory and DMs.",
+    detail: "Your profile and generated avatar are created automatically.",
   },
   {
-    icon: Radar,
+    icon: MessageSquarePlus,
     step: "02",
-    title: "Let Cadence find the signal",
-    body: "Raw feedback is deduplicated, clustered into themes and scored on revenue at risk, frequency and strategic fit — continuously, not once a quarter.",
-    detail: "Most teams see their first ranked backlog within the hour.",
+    title: "Create a server",
+    body: "One click and you have a server with #general and #random. Add channels, roles and permissions for whatever the group is about.",
+    detail: "You are the owner, so you start with every permission.",
   },
   {
-    icon: Rocket,
+    icon: KeyRound,
     step: "03",
-    title: "Ship, then close the loop",
-    body: "Export the ranked list straight into Linear or Jira. When the work ships, Cadence notifies every customer who asked and publishes it to your changelog.",
-    detail: "Closed-loop rate averages 74% across Cadence workspaces.",
+    title: "Invite people",
+    body: "Share the invite link. Anyone who joins appears in the member list with live presence, and can be messaged directly.",
+    detail: "First message arrives in well under a second.",
   },
 ] as const;
 
 const STATS = [
-  { value: "18.4M", label: "Feedback items analysed" },
-  { value: "3.4×", label: "Faster roadmap cycles" },
-  { value: "74%", label: "Average closed-loop rate" },
-  { value: "96%", label: "Annual logo retention" },
+  { value: "15", label: "Permission bits per role" },
+  { value: "40+", label: "Messages per page, on demand" },
+  { value: "6", label: "Tables on the realtime stream" },
+  { value: "0", label: "Servers needed to run it" },
 ] as const;
 
 export function HowItWorks() {
@@ -39,9 +40,9 @@ export function HowItWorks() {
       <Container wide>
         <Reveal>
           <SectionHeading
-            eyebrow="How it works"
-            title="From raw noise to shipped work in three moves"
-            lede="Cadence sits on top of the tools you already pay for. Nothing to migrate, no new habit for your team to learn."
+            eyebrow="Getting started"
+            title="From sign-up to a live channel in three steps"
+            lede="No server to provision, no database to wire up. Cadence talks to Supabase directly from the browser."
           />
         </Reveal>
 
@@ -73,7 +74,6 @@ export function HowItWorks() {
           ))}
         </ol>
 
-        {/* Stats band */}
         <Reveal delay={80}>
           <dl className="mt-16 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border/70 bg-border/70 sm:mt-20 lg:grid-cols-4">
             {STATS.map((stat) => (
@@ -88,6 +88,19 @@ export function HowItWorks() {
               </div>
             ))}
           </dl>
+        </Reveal>
+
+        <Reveal delay={120}>
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            Ready when you are —{" "}
+            <Link
+              to="/login"
+              className="rounded font-medium text-foreground underline decoration-ember-500/50 decoration-2 underline-offset-4 hover:decoration-ember-500"
+            >
+              create your account
+            </Link>{" "}
+            and start a server.
+          </p>
         </Reveal>
       </Container>
     </Section>

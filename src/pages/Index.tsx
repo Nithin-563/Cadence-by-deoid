@@ -12,12 +12,12 @@ import { FinalCta, Footer } from "@/components/landing/Footer";
 
 const Index = () => {
   useSeoMeta({
-    title: "Cadence — Stop guessing what to build next",
+    title: "Cadence — Servers, channels and DMs for your community",
     description:
-      "Cadence pulls customer feedback from support, calls, surveys and Slack, then turns it into prioritised, evidence-backed roadmap decisions your whole team can trust.",
-    ogTitle: "Cadence — Stop guessing what to build next",
+      "Cadence is a Discord-style chat app with servers, channels, roles, granular permissions and DMs. Realtime messaging powered by Supabase, free and self-hostable.",
+    ogTitle: "Cadence — Servers, channels and DMs for your community",
     ogDescription:
-      "The customer intelligence platform for teams that would rather ship the right thing than the loudest thing.",
+      "A Discord-style chat app with servers, channels, roles, permissions and DMs. Realtime on Supabase, free to run.",
     ogType: "website",
     twitterCard: "summary_large_image",
   });

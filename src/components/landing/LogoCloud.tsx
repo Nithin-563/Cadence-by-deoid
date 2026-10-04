@@ -2,14 +2,14 @@ import { CustomerWordmark } from "@/components/landing/Logo";
 import { Container, Reveal } from "@/components/landing/primitives";
 
 const CUSTOMERS = [
-  "Northwind",
-  "Halo Labs",
-  "Ferry",
-  "Brightline",
-  "Kestrel",
+  "Design Guild",
+  "Open Source",
+  "Game Night",
   "Meridian",
-  "Sable",
+  "Kestrel",
+  "Brightline",
   "Tidewater",
+  "Northwind",
 ] as const;
 
 const STRIP_CLASSES = "flex items-center gap-x-14 pr-14 sm:gap-x-20 sm:pr-20";
@@ -38,7 +38,7 @@ export function LogoCloud() {
             id="logo-cloud-heading"
             className="text-center text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase"
           >
-            Trusted by product teams at 2,400+ companies
+            Trusted by communities of every size
           </h2>
         </Reveal>
 

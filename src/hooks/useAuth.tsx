@@ -30,6 +30,15 @@ const AuthContext = React.createContext<AuthContextValue | undefined>(undefined)
 /** Friendly message for the errors Supabase actually returns. */
 function describeAuthError(error: { message: string }): Error {
   const message = error.message.toLowerCase();
+
+  if (message.includes("invalid api key") || message.includes("apikey")) {
+    return new Error(
+      "Supabase rejected the API key. In your project go to Settings → API and copy the current anon key into VITE_SUPABASE_ANON_KEY.",
+    );
+  }
+  if (message.includes("fetch failed") || message.includes("network")) {
+    return new Error("Couldn't reach Supabase. Check your connection and try again.");
+  }
   if (message.includes("invalid login credentials")) {
     return new Error("That email and password combination didn't work.");
   }

@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import {
   Accordion,
   AccordionContent,
@@ -9,28 +11,28 @@ import { Container, Reveal, Section, SectionHeading } from "@/components/landing
 
 const FAQS = [
   {
-    q: "Where does the feedback actually come from?",
-    a: "Anywhere your customers already talk. Cadence has native connectors for Zendesk, Intercom, Front, Gorgias, Gong, Zoom, Typeform, Delighted, Slack, Discord and Figma comments, plus a public JSON API and an inbound webhook for anything else. Import backfill is included on every plan.",
+    q: "Is this really free, or is there a catch?",
+    a: "No catch. Cadence is a client for your own Supabase project, so the only cost is whatever Supabase charges you — and their free tier handles most communities comfortably. There are no seats, no message caps and no feature gates.",
   },
   {
-    q: "How is the AI scoring actually calculated?",
-    a: "Each theme gets an impact score combining three signals: revenue attached to the accounts raising it, frequency and growth over time, and a strategic-fit weight you control per team. Scores are fully explainable — every number links back to the source items that produced it, so you can audit any ranking decision.",
+    q: "What backend does it actually use?",
+    a: "Supabase, for everything. Auth is Supabase Auth, the data lives in Postgres, live updates use Supabase Realtime (a WebSocket plus broadcast and presence), avatars go to Storage, and Row Level Security enforces every permission in the database rather than trusting the client.",
   },
   {
-    q: "Do you train models on our customer data?",
-    a: "No. Your data is isolated per workspace, encrypted at rest with AES-256 and in transit with TLS 1.3, and is never used to train shared models. Enterprise plans can pin processing to the EU or US and enforce custom retention windows.",
+    q: "How do the Discord-style permissions work?",
+    a: "Every role is a bigint bitmask across 15 permissions. A member's base permissions are @everyone plus the union of their roles. Server owners and anyone with the Administrator bit get everything. On top of that, each channel can allow or deny specific bits per role or per person — resolved as (base & ~deny) | allow, in SQL.",
   },
   {
-    q: "Will this replace our roadmap tool?",
-    a: "It usually doesn't — it feeds it. Cadence ranks and justifies what to build, then pushes the result into Linear, Jira, Asana, Productboard or a public roadmap. The moment a theme ships, we notify everyone who asked and publish it to your changelog.",
+    q: "Do I need to run a server?",
+    a: "No. There is no application server. The app is a static build that talks to Supabase from the browser, so it deploys to Netlify, Vercel or any static host. The security model depends on Row Level Security, not on a hidden backend.",
   },
   {
-    q: "How long does implementation take?",
-    a: "Connecting your first source takes about four minutes. Historical import of 90 days of feedback runs in the background and is usually searchable within the hour. Teams running their first roadmap review off Cadence data do so in week one.",
+    q: "Can people impersonate others or read channels they can't see?",
+    a: "No. Row Level Security is enabled on all fifteen tables. Messages, channels, reactions and reads are all filtered by channel_permission() in Postgres, which resolves the role bitmask and channel overwrites before returning a single row. Hiding something in the UI is never the thing protecting it.",
   },
   {
-    q: "What happens when the trial ends?",
-    a: "Nothing breaks. You drop to the free Community plan with one data source and 500 items a month, keep every insight you generated, and can upgrade whenever you like. We do not auto-charge and we do not hold your data hostage.",
+    q: "What about voice, video and threads?",
+    a: "Not yet. Cadence covers servers, text channels, roles and permissions, DMs, friends, reactions, replies, presence and typing indicators. Voice and video channels are the obvious next step and the schema has room for them.",
   },
 ] as const;
 
@@ -42,7 +44,7 @@ export function Faq() {
           <SectionHeading
             eyebrow="FAQ"
             title="Questions, answered"
-            lede="Still unsure? Our team replies in under a business day — usually much faster."
+            lede="Still stuck? The README walks through setup end to end, or open an issue on the repo."
           />
         </Reveal>
 
@@ -64,15 +66,17 @@ export function Faq() {
         <Reveal delay={140}>
           <div className="mt-12 flex flex-col items-center gap-4 rounded-2xl border border-dashed bg-card/60 px-6 py-10 text-center">
             <div>
-              <h3 className="text-lg font-semibold tracking-tight">Can’t find what you’re after?</h3>
+              <h3 className="text-lg font-semibold tracking-tight">Ready to try it?</h3>
               <p className="mt-1.5 text-sm text-muted-foreground">
-                Talk to a human, or read the full docs.
+                Create an account and your first server takes about four minutes.
               </p>
             </div>
             <div className="flex flex-col gap-2.5 sm:flex-row">
-              <Button className="rounded-full">Contact sales</Button>
-              <Button variant="outline" className="rounded-full">
-                Read the docs
+              <Button asChild className="rounded-full">
+                <Link to="/app">Open Cadence</Link>
+              </Button>
+              <Button asChild variant="outline" className="rounded-full">
+                <Link to="/login">Create an account</Link>
               </Button>
             </div>
           </div>

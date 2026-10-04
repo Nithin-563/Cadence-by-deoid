@@ -1,8 +1,8 @@
 {
-  "name": "Cadence — Customer intelligence for product teams",
+  "name": "Cadence — Servers, channels and DMs",
   "short_name": "Cadence",
-  "description": "Pull customer feedback from every channel and turn it into prioritised, evidence-backed roadmap decisions.",
-  "start_url": "/",
+  "description": "A Discord-style chat app with servers, channels, roles, permissions and DMs. Realtime on Supabase.",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "background_color": "#faf7f2",
