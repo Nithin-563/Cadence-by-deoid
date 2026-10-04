@@ -27,7 +27,7 @@ export default function Login() {
   });
 
   const navigate = useNavigate();
-  const { signIn, signUp, signInWithGoogle, user, loading, configured } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user, configured } = useAuth();
 
   const [mode, setMode] = React.useState<Mode>("signup");
   const [email, setEmail] = React.useState("");
@@ -40,8 +40,8 @@ export default function Login() {
 
   // Already signed in? Skip straight into the app.
   React.useEffect(() => {
-    if (!loading && user) navigate("/app", { replace: true });
-  }, [loading, user, navigate]);
+    if (user) navigate("/app", { replace: true });
+  }, [user, navigate]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();

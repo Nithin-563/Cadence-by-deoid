@@ -13,9 +13,9 @@ import { Logo } from "@/components/landing/Logo";
 export default function Invite() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, status } = useAuth();
 
-  const [status, setStatus] = React.useState<"idle" | "joining" | "done" | "error">("idle");
+  const [phase, setPhase] = React.useState<"idle" | "joining" | "done" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
 
   useSeoMeta({
@@ -26,27 +26,29 @@ export default function Invite() {
 
   const join = React.useCallback(async () => {
     if (!code) return;
-    setStatus("joining");
+    setPhase("joining");
     setError(null);
     const { error: joinError } = await supabase.rpc("join_server", { p_code: code });
     if (joinError) {
-      setStatus("error");
+      setPhase("error");
       setError(joinError.message);
       return;
     }
-    setStatus("done");
+    setPhase("done");
     window.setTimeout(() => navigate("/app", { replace: true }), 900);
   }, [code, navigate]);
 
   // Sign in first if we don't have a session yet.
   React.useEffect(() => {
-    if (!loading && !user) navigate(`/login?next=${encodeURIComponent(`/invite/${code}`)}`, { replace: true });
-  }, [loading, user, navigate, code]);
+    if (!user && status !== "loading") {
+      navigate(`/login?next=${encodeURIComponent(`/invite/${code}`)}`, { replace: true });
+    }
+  }, [user, status, navigate, code]);
 
-  // Auto-join once signed in.
+  // Auto-join once signed in and the profile is ready.
   React.useEffect(() => {
-    if (user && status === "idle") void join();
-  }, [user, status, join]);
+    if (user && phase === "idle") void join();
+  }, [user, phase, join]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -58,13 +60,13 @@ export default function Invite() {
 
       <main className="flex flex-1 items-center justify-center px-5 pb-16">
         <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center">
-          {status === "done" ? (
+          {phase === "done" ? (
             <>
               <PartyPopper className="mx-auto size-8 text-ember-500" />
               <h1 className="mt-4 text-xl font-semibold">You're in!</h1>
               <p className="mt-1.5 text-sm text-muted-foreground">Taking you to the app…</p>
             </>
-          ) : status === "error" ? (
+          ) : phase === "error" ? (
             <>
               <h1 className="text-xl font-semibold">That invite didn't work</h1>
               <p className="mt-1.5 text-sm text-muted-foreground">{error}</p>

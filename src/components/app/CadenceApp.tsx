@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Compass, Loader2, MessageSquare, Plus } from "lucide-react";
+import { MessageSquare, Plus } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import {
@@ -32,6 +32,7 @@ import { SettingsView } from "@/components/app/SettingsView";
 import { ServerSettings } from "@/components/app/ServerSettings";
 import { Avatar } from "@/components/app/Avatar";
 import { Button } from "@/components/ui/button";
+import { FullPageLoader } from "@/components/app/AuthGate";
 import {
   CreateChannelDialog,
   CreateServerDialog,
@@ -51,7 +52,7 @@ type View =
 const NOOP = () => undefined;
 
 export function CadenceApp() {
-  const { user, profile, signOut, configured } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const { presence, onlineIds, setStatus } = usePresence();
 
   const { servers, reload: reloadServers } = useMyServers();
@@ -266,7 +267,8 @@ export function CadenceApp() {
 
   /* ---------------------------------------------------------- rendering --- */
 
-  if (!configured) return <SetupNotice />;
+  // AuthGate already guarantees a signed-in user with a loaded profile, so these
+  // are defensive only — they must never strand the user on a blank screen.
   if (!user || !profile) return <FullPageLoader label="Opening Cadence…" />;
 
   return (
@@ -869,14 +871,8 @@ function EmptyRow({ text, action, onClick }: { text: string; action: string; onC
 
 /* --------------------------------------------------------------- states --- */
 
-export function FullPageLoader({ label }: { label: string }) {
-  return (
-    <div className="flex h-dvh flex-col items-center justify-center gap-3 bg-background">
-      <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">{label}</p>
-    </div>
-  );
-}
+/* Auth loading, error and "not configured" screens live in <AuthGate> so the
+   /app route and any other entry point share the same behaviour. */
 
 function SetupNotice() {
   return (

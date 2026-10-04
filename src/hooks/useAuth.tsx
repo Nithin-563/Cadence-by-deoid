@@ -4,18 +4,22 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { row, type Profile } from "@/lib/database.types";
 
+export type AuthStatus = "loading" | "ready" | "error";
+
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
-  /** True until the initial session + profile lookup settles. */
-  loading: boolean;
+  status: AuthStatus;
+  /** Human-readable reason when `status` is "error". */
+  error: string | null;
   configured: boolean;
   signUp: (input: SignUpInput) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  retry: () => void;
 }
 
 export interface SignUpInput {
@@ -28,15 +32,15 @@ export interface SignUpInput {
 const AuthContext = React.createContext<AuthContextValue | undefined>(undefined);
 
 /** Friendly message for the errors Supabase actually returns. */
-function describeAuthError(error: { message: string }): Error {
+export function describeAuthError(error: { message: string }): Error {
   const message = error.message.toLowerCase();
 
   if (message.includes("invalid api key") || message.includes("apikey")) {
     return new Error(
-      "Supabase rejected the API key. In your project go to Settings → API and copy the current anon key into VITE_SUPABASE_ANON_KEY.",
+      "Supabase rejected this project's API key. Open Project Settings → API, copy the current anon / publishable key, and update VITE_SUPABASE_ANON_KEY (plus the fallback in src/lib/supabase.ts).",
     );
   }
-  if (message.includes("fetch failed") || message.includes("network")) {
+  if (message.includes("failed to fetch") || message.includes("network")) {
     return new Error("Couldn't reach Supabase. Check your connection and try again.");
   }
   if (message.includes("invalid login credentials")) {
@@ -57,98 +61,175 @@ function describeAuthError(error: { message: string }): Error {
   return new Error(error.message);
 }
 
+/** Derive a safe, unique-ish username when a profile has to be backfilled. */
+function fallbackUsername(email: string): string {
+  const base = (email.split("@")[0] ?? "user").toLowerCase().replace(/[^a-z0-9_.]/g, "");
+  const trimmed = base.slice(0, 18);
+  return trimmed.length >= 3 ? trimmed : `cadence_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<Session | null>(null);
+  const [sessionReady, setSessionReady] = React.useState(false);
   const [profile, setProfile] = React.useState<Profile | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const [status, setStatus] = React.useState<AuthStatus>("loading");
+  const [error, setError] = React.useState<string | null>(null);
+  const [reloadToken, setReloadToken] = React.useState(0);
 
-  const loadProfile = React.useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
+  const retry = React.useCallback(() => setReloadToken((token) => token + 1), []);
 
-    if (error) {
-      console.error("Failed to load profile", error);
-      setProfile(null);
-      return;
-    }
-    setProfile(row<Profile>(data));
-  }, []);
-
-  // Initial session + react to sign-in/sign-out.
+  /* ------------------------------------------------------------- session --- */
+  // Deliberately does NOT touch any other Supabase method inside the callback —
+  // awaiting a query from onAuthStateChange deadlocks the auth client.
   React.useEffect(() => {
     if (!isSupabaseConfigured) {
-      setLoading(false);
+      setSessionReady(true);
       return;
     }
 
     let active = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      if (data.session?.user) {
-        await loadProfile(data.session.user.id);
-      }
-      if (active) setLoading(false);
-    });
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+        setSessionReady(true);
+      })
+      .catch((caught: unknown) => {
+        if (!active) return;
+        setError(caught instanceof Error ? caught.message : "Could not read your session.");
+        setStatus("error");
+        setSessionReady(true);
+      });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, next) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
-      if (next?.user && event !== "TOKEN_REFRESHED") {
-        void loadProfile(next.user.id);
-      }
-      if (!next) setProfile(null);
-      setLoading(false);
+      setSessionReady(true);
     });
 
     return () => {
       active = false;
-      listener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
-  }, [loadProfile]);
+  }, []);
+
+  /* ------------------------------------------------------------- profile --- */
+  // Runs in its own effect so the profile query never happens inside an auth
+  // callback, and so it re-runs whenever the signed-in user changes.
+  React.useEffect(() => {
+    if (!sessionReady) return;
+
+    const userId = session?.user?.id;
+    if (!userId) {
+      setProfile(null);
+      setStatus("ready");
+      setError(null);
+      return;
+    }
+
+    let active = true;
+    setStatus("loading");
+    setError(null);
+
+    void (async () => {
+      try {
+        const existing = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (existing.error) throw describeAuthError(existing.error);
+
+        let found = row<Profile>(existing.data);
+
+        if (!found) {
+          // The account predates the schema (or the signup trigger didn't fire),
+          // so backfill the profile rather than hanging on a loading screen.
+          const meta = session?.user?.user_metadata ?? {};
+          const created = await supabase
+            .from("profiles")
+            .insert({
+              id: userId,
+              username: fallbackUsername(session?.user?.email ?? userId),
+              display_name:
+                typeof meta.display_name === "string" && meta.display_name
+                  ? meta.display_name
+                  : (session?.user?.email ?? "Cadence user").split("@")[0],
+              about: typeof meta.about === "string" ? meta.about : "",
+            })
+            .select()
+            .single();
+
+          if (created.error) throw describeAuthError(created.error);
+          found = row<Profile>(created.data);
+        }
+
+        if (!active) return;
+        setProfile(found);
+        setStatus("ready");
+      } catch (caught) {
+        if (!active) return;
+        setProfile(null);
+        setError(caught instanceof Error ? caught.message : "Could not load your profile.");
+        setStatus("error");
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id, sessionReady, reloadToken]);
 
   const value = React.useMemo<AuthContextValue>(
     () => ({
       session,
       user: session?.user ?? null,
       profile,
-      loading,
+      status,
+      error,
       configured: isSupabaseConfigured,
       async signUp({ email, password, username, displayName }) {
-        const { error } = await supabase.auth.signUp({
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: { username, display_name: displayName },
-            emailRedirectTo: window.location.origin + "/app",
+            emailRedirectTo: `${window.location.origin}/app`,
           },
         });
-        if (error) throw describeAuthError(error);
+        if (signUpError) throw describeAuthError(signUpError);
       },
       async signIn(email, password) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw describeAuthError(error);
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) throw describeAuthError(signInError);
       },
       async signInWithGoogle() {
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { error: oauthError } = await supabase.auth.signInWithOAuth({
           provider: "google",
-          options: { redirectTo: window.location.origin + "/app" },
+          options: { redirectTo: `${window.location.origin}/app` },
         });
-        if (error) throw describeAuthError(error);
+        if (oauthError) throw describeAuthError(oauthError);
       },
       async signOut() {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw new Error(error.message);
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) throw describeAuthError(signOutError);
         setProfile(null);
+        setStatus("ready");
       },
-      refreshProfile: async () => {
-        if (session?.user) await loadProfile(session.user.id);
+      async refreshProfile() {
+        const userId = session?.user?.id;
+        if (!userId) return;
+        const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+        const fresh = row<Profile>(data);
+        if (fresh) setProfile(fresh);
       },
+      retry,
     }),
-    [session, profile, loading, loadProfile],
+    [session, profile, status, error, retry],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
