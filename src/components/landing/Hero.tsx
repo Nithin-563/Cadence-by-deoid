@@ -1,4 +1,5 @@
 import { ArrowRight, CirclePlay, Star } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Container, Reveal } from "@/components/landing/primitives";
@@ -20,16 +21,16 @@ export function Hero() {
 
       <Container className="flex flex-col items-center text-center">
         <Reveal>
-          <a
-            href="#features"
+          <Link
+            to="/app"
             className="group inline-flex items-center gap-2 rounded-full border border-border/80 bg-card/80 py-1 pr-3 pl-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <span className="rounded-full bg-linear-to-r from-ember-500 to-gold-400 px-2 py-0.5 text-[11px] font-semibold text-white">
               New
             </span>
-            Cadence AI now drafts roadmap updates for you
+            Live channels, DMs and friends — open the app
             <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-          </a>
+          </Link>
         </Reveal>
 
         <Reveal delay={80}>
@@ -52,17 +53,22 @@ export function Hero() {
 
         <Reveal delay={240}>
           <div className="mt-9 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
-            <Button size="lg" className="group h-12 w-full rounded-full px-7 text-base sm:w-auto">
-              Start free trial
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            <Button asChild size="lg" className="group h-12 w-full rounded-full px-7 text-base sm:w-auto">
+              <Link to="/app">
+                Open Cadence
+                <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
             </Button>
             <Button
+              asChild
               size="lg"
               variant="outline"
               className="h-12 w-full rounded-full px-7 text-base sm:w-auto"
             >
-              <CirclePlay className="size-4 text-ember-500" />
-              Watch 2-min demo
+              <Link to="/app">
+                <CirclePlay className="size-4 text-ember-500" />
+                Watch 2-min demo
+              </Link>
             </Button>
           </div>
         </Reveal>

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Menu, Moon, Sun, X } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
@@ -112,10 +113,12 @@ export function Nav() {
 
         <div className="hidden items-center gap-2 md:flex">
           <ThemeToggle />
-          <Button variant="ghost" className="px-3">
-            Sign in
+          <Button asChild variant="ghost" className="px-3">
+            <Link to="/login">Sign in</Link>
           </Button>
-          <Button className="rounded-full px-4 shadow-sm">Start free</Button>
+          <Button asChild className="rounded-full px-4 shadow-sm">
+            <Link to="/app">Open Cadence</Link>
+          </Button>
         </div>
 
         <div className="flex items-center gap-1 md:hidden">
@@ -151,10 +154,12 @@ export function Nav() {
             </a>
           ))}
           <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-4">
-            <Button variant="outline" className="w-full">
-              Sign in
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/login">Sign in</Link>
             </Button>
-            <Button className="w-full rounded-full">Start free</Button>
+            <Button asChild className="w-full rounded-full">
+              <Link to="/app">Open Cadence</Link>
+            </Button>
           </div>
         </Container>
       </div>

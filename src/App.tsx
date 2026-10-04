@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NostrLoginProvider } from '@nostrify/react/login';
 import { AppProvider } from '@/components/AppProvider';
+import { AuthProvider } from '@/hooks/useAuth';
 import { AppConfig } from '@/contexts/AppContext';
 import { APP_RELAYS } from '@/lib/appRelays';
 import AppRouter from './AppRouter';
@@ -49,19 +50,21 @@ export function App() {
   return (
     <UnheadProvider head={head}>
       <AppProvider storageKey="nostr:app-config" defaultConfig={defaultConfig}>
-        <QueryClientProvider client={queryClient}>
-          <NostrLoginProvider storageKey='nostr:login'>
-            <NostrProvider>
-              <NostrSync />
-              <TooltipProvider>
-                <Toaster />
-                <Suspense>
-                  <AppRouter />
-                </Suspense>
-              </TooltipProvider>
-            </NostrProvider>
-          </NostrLoginProvider>
-        </QueryClientProvider>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <NostrLoginProvider storageKey='nostr:login'>
+              <NostrProvider>
+                <NostrSync />
+                <TooltipProvider>
+                  <Toaster />
+                  <Suspense>
+                    <AppRouter />
+                  </Suspense>
+                </TooltipProvider>
+              </NostrProvider>
+            </NostrLoginProvider>
+          </QueryClientProvider>
+        </AuthProvider>
       </AppProvider>
     </UnheadProvider>
   );

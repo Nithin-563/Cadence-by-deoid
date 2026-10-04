@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Container, Reveal } from "@/components/landing/primitives";
 import { Logo } from "@/components/landing/Logo";
@@ -25,19 +26,19 @@ export function FinalCta() {
             </p>
 
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <a
-                href="#pricing"
+              <Link
+                to="/app"
                 className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-panel-foreground px-7 text-base font-medium whitespace-nowrap text-panel transition-colors hover:bg-panel-foreground/90 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:w-auto"
               >
-                Start free trial
+                Open Cadence
                 <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-              </a>
-              <a
-                href="#top"
+              </Link>
+              <Link
+                to="/login"
                 className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-panel-foreground/30 px-7 text-base font-medium whitespace-nowrap text-panel-foreground transition-colors hover:bg-panel-foreground/10 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:w-auto"
               >
-                Book a demo
-              </a>
+                Create an account
+              </Link>
             </div>
 
             <p className="mt-6 text-sm text-panel-foreground/55">
