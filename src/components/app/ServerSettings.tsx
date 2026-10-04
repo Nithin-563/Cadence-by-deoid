@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Camera, ChevronRight, Plus, Trash2 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import type { Channel, ChannelOverwrite, MyServer, Role } from "@/lib/database.types";
@@ -123,7 +123,9 @@ function OverviewTab({ server, onChanged }: { server: MyServer; onChanged: () =>
   const [name, setName] = React.useState(server.name);
   const [description, setDescription] = React.useState(server.description);
   const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
+  const fileRef = React.useRef<HTMLInputElement | null>(null);
 
   const save = async () => {
     setSaving(true);
@@ -136,9 +138,85 @@ function OverviewTab({ server, onChanged }: { server: MyServer; onChanged: () =>
     if (!error) onChanged();
   };
 
+  const uploadIcon = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setMessage("The icon must be an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage("That image is over the 5 MB limit.");
+      return;
+    }
+
+    setUploading(true);
+    const extension = file.name.split(".").pop() ?? "png";
+    const path = `${server.id}/icon-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("server-icons")
+      .upload(path, file, { contentType: file.type, upsert: true });
+
+    if (uploadError) {
+      setUploading(false);
+      setMessage(`Upload failed: ${uploadError.message}`);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from("server-icons").getPublicUrl(path);
+    const { error: updateError } = await supabase
+      .from("servers")
+      .update({ icon_url: urlData.publicUrl })
+      .eq("id", server.id);
+
+    setUploading(false);
+    setMessage(updateError ? updateError.message : "Icon updated.");
+    if (!updateError) onChanged();
+  };
+
   return (
     <section className="space-y-5 rounded-2xl border bg-card p-6">
       <h2 className="text-sm font-semibold">Server overview</h2>
+
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative">
+          {server.icon_url ? (
+            <img
+              src={server.icon_url}
+              alt=""
+              className="size-20 rounded-[28%] object-cover"
+            />
+          ) : (
+            <span className="font-display flex size-20 items-center justify-center rounded-[28%] bg-linear-to-br from-ember-500 to-gold-400 text-2xl text-white">
+              {server.name.slice(0, 2).toUpperCase()}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            aria-label="Change server icon"
+            className="absolute -right-1 -bottom-1 flex size-7 items-center justify-center rounded-full border-2 border-card bg-foreground text-background transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <Camera className="size-3.5" />
+          </button>
+        </div>
+        <div>
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? "Uploading…" : "Upload icon"}
+          </Button>
+          <p className="mt-1.5 text-xs text-muted-foreground">Square images work best. Up to 5 MB.</p>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void uploadIcon(file);
+            event.target.value = "";
+          }}
+        />
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="server-name">Server name</Label>
