@@ -10,8 +10,11 @@ const TYPING_TTL_MS = 6000;
 const TYPING_THROTTLE_MS = 2500;
 
 export interface PresenceState {
-  /** userId -> their current status. */
-  users: Record<string, PresenceStatus>;
+  /**
+   * Map of userId -> their current status. Named to match every consumer,
+   * which pass it straight through as a `presence` prop.
+   */
+  presence: Record<string, PresenceStatus>;
   onlineIds: string[];
   setStatus: (status: PresenceStatus) => void;
 }
@@ -93,7 +96,7 @@ export function usePresence(): PresenceState {
     [users],
   );
 
-  return { users, onlineIds, setStatus };
+  return { presence: users, onlineIds, setStatus };
 }
 
 /**

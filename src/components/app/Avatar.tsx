@@ -73,5 +73,3 @@ export function Avatar({
     </span>
   );
 }
-
-export { PRESENCE_DOT };

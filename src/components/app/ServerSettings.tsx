@@ -697,7 +697,7 @@ function MembersTab({
   server,
   roles,
   members,
-  memberRoleMap,
+  memberRoleMap = {},
   onChanged,
 }: {
   server: MyServer;

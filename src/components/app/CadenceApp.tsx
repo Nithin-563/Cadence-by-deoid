@@ -502,7 +502,6 @@ export function CadenceApp() {
             basePermissions={basePermissions}
             presence={presence}
             onlineIds={onlineIds}
-            isMember={(userId) => members.some((m) => m.id === userId)}
             onOpenProfile={(userId) => void openUserProfile(userId)}
             onOpenDm={(userId) => void openDm(userId)}
             onKick={(userId) => void kickMember(userId)}
@@ -586,7 +585,6 @@ function MessageList({
   onReact: (messageId: string, emoji: string) => void;
   onOpenProfile: (userId: string) => void;
 }) {
-  const bottomRef = React.useRef<HTMLDivElement | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const previousCount = React.useRef(messages.length);
 
@@ -671,7 +669,6 @@ function MessageList({
           </React.Fragment>
         );
       })}
-      <div ref={bottomRef} />
     </div>
   );
 }

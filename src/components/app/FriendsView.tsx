@@ -18,7 +18,13 @@ interface FriendsViewProps {
 }
 
 /** Directory, search, friend requests and the accepted friends list. */
-export function FriendsView({ presence, onlineIds, onOpenDm, onOpenProfile, onChanged }: FriendsViewProps) {
+export function FriendsView({
+  presence = {},
+  onlineIds = [],
+  onOpenDm,
+  onOpenProfile,
+  onChanged,
+}: FriendsViewProps) {
   const { user } = useAuth();
   const [query, setQuery] = React.useState("");
   const [friendships, setFriendships] = React.useState<Friendship[]>([]);
@@ -44,7 +50,8 @@ export function FriendsView({ presence, onlineIds, onOpenDm, onOpenProfile, onCh
 
   // Debounced directory search.
   React.useEffect(() => {
-    if (!query.trim()) {
+    const raw = query.trim();
+    if (!raw) {
       setDirectory([]);
       setSearching(false);
       return;
@@ -53,8 +60,10 @@ export function FriendsView({ presence, onlineIds, onOpenDm, onOpenProfile, onCh
     setSearching(true);
     let active = true;
     const handle = window.setTimeout(async () => {
-      const term = query.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "");
-      if (!term) {
+      // PostgREST `or()` uses commas and dots as syntax, so strip them from
+      // user input — otherwise a search for "a,b" is a 400.
+      const cleaned = raw.replace(/[,()*%]/g, " ").trim();
+      if (!cleaned) {
         if (active) {
           setDirectory([]);
           setSearching(false);
@@ -64,8 +73,10 @@ export function FriendsView({ presence, onlineIds, onOpenDm, onOpenProfile, onCh
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, username, display_name, about, avatar_url, banner_url, status_text, created_at, updated_at")
-        .or(`username.ilike.%${term}%,display_name.ilike.%${query.trim()}%`)
+        .select(
+          "id, username, display_name, about, avatar_url, banner_url, status_text, created_at, updated_at",
+        )
+        .or(`username.ilike.%${cleaned}%,display_name.ilike.%${cleaned}%`)
         .neq("id", user?.id ?? "")
         .limit(25);
 

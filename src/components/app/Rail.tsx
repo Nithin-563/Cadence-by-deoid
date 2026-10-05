@@ -72,7 +72,7 @@ function Tile({
 export function Rail({
   servers,
   activeServerId,
-  unreadByServer,
+  unreadByServer = {},
   onSelectHome,
   onSelectFriends,
   onSelectServer,

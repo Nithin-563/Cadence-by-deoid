@@ -23,7 +23,6 @@ interface MemberListProps {
   basePermissions: number;
   presence: Record<string, PresenceStatus>;
   onlineIds: string[];
-  isMember: (userId: string) => boolean;
   onOpenProfile: (userId: string) => void;
   onOpenDm: (userId: string) => void;
   onKick: (userId: string) => void;
@@ -37,9 +36,9 @@ export function MemberList({
   currentUserId,
   ownerId,
   basePermissions,
-  presence,
-  onlineIds,
-  isMember,
+  // Defaults keep a missing prop from turning into a blank screen.
+  presence = {},
+  onlineIds = [],
   onOpenProfile,
   onOpenDm,
   onKick,
