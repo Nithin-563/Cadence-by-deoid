@@ -1,11 +1,15 @@
-import { ArrowRight, CirclePlay, Star } from "lucide-react";
+import { ArrowRight, Play, Shield, Sparkles, Star, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Container, Reveal } from "@/components/landing/primitives";
-import { ChatMockup } from "@/components/app/ChatMockup";
+import { ProductShowcase } from "@/components/landing/ProductShowcase";
 
-const TRUST_POINTS = ["Free forever", "No credit card", "Deploy in minutes"] as const;
+const HIGHLIGHTS = [
+  { label: "Voice, video-ready", icon: Zap },
+  { label: "15-bit role permissions", icon: Shield },
+  { label: "Realtime, no polling", icon: Sparkles },
+] as const;
 
 export function Hero() {
   return (
@@ -21,55 +25,47 @@ export function Hero() {
       <Container className="flex flex-col items-center text-center">
         <Reveal>
           <Link
-            to="/login"
+            to="/app"
             className="group inline-flex items-center gap-2 rounded-full border border-border/80 bg-card/80 py-1 pr-3 pl-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <span className="rounded-full bg-linear-to-r from-ember-500 to-gold-400 px-2 py-0.5 text-[11px] font-semibold text-white">
-              Live
+              New
             </span>
-            Realtime messaging, powered by Supabase
+            Peer-to-peer voice channels are live
             <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </Reveal>
 
         <Reveal delay={80}>
           <h1 className="mt-7 max-w-4xl text-balance text-4xl leading-[1.05] font-semibold tracking-[-0.03em] sm:text-6xl lg:text-[4.25rem]">
-            Your community,
+            Not another Discord clone.
             <span className="font-display italic text-ember-600 dark:text-ember-400">
               {" "}
-              finally in one place.
+              Yours, on your infrastructure.
             </span>
           </h1>
         </Reveal>
 
         <Reveal delay={160}>
           <p className="mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground sm:text-xl">
-            Cadence is a Discord-style chat app with servers, channels, roles, granular
-            permissions and DMs — built on Supabase so your messages arrive the{" "}
-            <span className="font-medium text-foreground">instant</span> someone hits send.
+            Servers, text and voice channels, roles with real permissions, DMs, friends and
+            file sharing — running on a Supabase project{" "}
+            <span className="font-medium text-foreground">you</span> own. No platform, no
+            per-seat pricing, no data leaving your account.
           </p>
         </Reveal>
 
         <Reveal delay={240}>
           <div className="mt-9 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
-            <Button
-              asChild
-              size="lg"
-              className="group h-12 w-full rounded-full px-7 text-base sm:w-auto"
-            >
+            <Button asChild size="lg" className="group h-12 w-full rounded-full px-7 text-base sm:w-auto">
               <Link to="/app">
                 Open Cadence
                 <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="h-12 w-full rounded-full px-7 text-base sm:w-auto"
-            >
+            <Button asChild size="lg" variant="outline" className="h-12 w-full rounded-full px-7 text-base sm:w-auto">
               <Link to="/login">
-                <CirclePlay className="size-4 text-ember-500" />
+                <Play className="size-4 text-ember-500" />
                 Create a free account
               </Link>
             </Button>
@@ -77,65 +73,32 @@ export function Hero() {
         </Reveal>
 
         <Reveal delay={320}>
-          <div className="mt-6 flex flex-col items-center gap-3">
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+              {HIGHLIGHTS.map((item) => (
+                <li key={item.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <item.icon className="size-3.5 text-teal" />
+                  {item.label}
+                </li>
+              ))}
+            </ul>
             <div className="flex items-center gap-1" aria-hidden="true">
               {Array.from({ length: 5 }).map((_, index) => (
                 <Star key={index} className="size-4 fill-gold-400 text-gold-400" />
               ))}
             </div>
             <p className="text-sm text-muted-foreground">
-              Built for communities of every size —{" "}
-              <span className="font-medium text-foreground">open source</span>,{" "}
-              <span className="font-medium text-foreground">self-hostable</span>, and free to run
+              Free forever · <span className="font-medium text-foreground">No credit card</span> ·
+              Bring your own Supabase project
             </p>
           </div>
         </Reveal>
       </Container>
 
-      {/* Product mockup */}
       <Container wide className="relative mt-16 sm:mt-20">
         <Reveal delay={120}>
-          <div className="relative">
-            <div
-              aria-hidden="true"
-              className="absolute -inset-x-6 -top-6 bottom-0 rounded-[2rem] bg-linear-to-b from-ember-500/10 to-transparent blur-2xl"
-            />
-            <ChatMockup className="relative" />
-
-            <div className="absolute -right-2 -bottom-10 hidden w-56 rounded-xl border border-border/80 bg-card/95 p-4 shadow-xl shadow-foreground/10 backdrop-blur-xl xl:block">
-              <p className="text-xs font-semibold">Roles in this server</p>
-              <ul className="mt-2 space-y-1">
-                {[
-                  { name: "Owner", color: "#eab308" },
-                  { name: "Moderator", color: "#8b5cf6" },
-                  { name: "Contributor", color: "#0ea5e9" },
-                  { name: "@everyone", color: "#9ca3af" },
-                ].map((role) => (
-                  <li key={role.name} className="flex items-center gap-2 text-[11px]">
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: role.color }}
-                      aria-hidden="true"
-                    />
-                    <span className="truncate">{role.name}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2.5 border-t border-border/60 pt-2 text-[10px] text-muted-foreground">
-                15 permissions, resolved per channel
-              </p>
-            </div>
-          </div>
+          <ProductShowcase />
         </Reveal>
-
-        <ul className="mt-16 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:mt-20 lg:mt-24">
-          {TRUST_POINTS.map((point) => (
-            <li key={point} className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-teal" aria-hidden="true" />
-              {point}
-            </li>
-          ))}
-        </ul>
       </Container>
     </section>
   );

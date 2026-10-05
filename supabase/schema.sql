@@ -269,6 +269,46 @@ create table if not exists public.pins (
 create index if not exists pins_channel_idx on public.pins (channel_id, created_at desc);
 
 -- =============================================================================
+-- Voice channels
+--
+-- Voice is peer-to-peer WebRTC. Supabase Realtime broadcast carries the
+-- signalling (offer/answer/ICE); audio flows directly between browsers, so
+-- there is no media server. That keeps the mesh small — past ~6 people every
+-- browser is uploading N-1 streams, so larger calls need a real SFU.
+-- =============================================================================
+
+create table if not exists public.voice_channels (
+  id         uuid primary key default gen_random_uuid(),
+  server_id  uuid not null references public.servers(id) on delete cascade,
+  name       text not null check (char_length(name) between 1 and 64),
+  position   integer not null default 0,
+  user_limit integer check (user_limit is null or user_limit between 1 and 99),
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists voice_channels_server_idx
+  on public.voice_channels (server_id, position);
+
+-- Who is currently connected to which voice channel.
+create table if not exists public.voice_states (
+  channel_id uuid not null references public.voice_channels(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  session_id text not null,
+  self_mute  boolean not null default false,
+  self_deaf  boolean not null default false,
+  joined_at  timestamptz not null default now(),
+  primary key (channel_id, user_id)
+);
+
+create index if not exists voice_states_channel_idx on public.voice_states (channel_id);
+
+-- File/image attachments on messages. Shape:
+--   [{ "url": string, "name": string, "type": string, "size": number }]
+alter table public.messages
+  add column if not exists attachments jsonb not null default '[]'::jsonb;
+
+-- =============================================================================
 -- Social graph
 -- =============================================================================
 
@@ -612,6 +652,8 @@ alter table public.messages           enable row level security;
 alter table public.reactions          enable row level security;
 alter table public.channel_reads      enable row level security;
 alter table public.pins               enable row level security;
+alter table public.voice_channels     enable row level security;
+alter table public.voice_states       enable row level security;
 alter table public.friendships        enable row level security;
 alter table public.user_blocks        enable row level security;
 
@@ -833,6 +875,32 @@ create policy pins_delete on public.pins
        & public.perm_bit('MANAGE_MESSAGES') <> 0
   );
 
+-- voice channels -------------------------------------------------------------
+drop policy if exists voice_channels_select on public.voice_channels;
+create policy voice_channels_select on public.voice_channels
+  for select using (public.is_member(server_id));
+
+drop policy if exists voice_channels_admin on public.voice_channels;
+create policy voice_channels_admin on public.voice_channels
+  for all using (public.base_permission(server_id, auth.uid()) <> 0)
+  with check (public.base_permission(server_id, auth.uid()) <> 0);
+
+-- voice states ---------------------------------------------------------------
+-- Anyone who can see the server may read who is connected; only a user may
+-- write their own row.
+drop policy if exists voice_states_select on public.voice_states;
+create policy voice_states_select on public.voice_states
+  for select using (
+    exists (select 1 from public.voice_channels vc
+             where vc.id = voice_states.channel_id
+               and public.is_member(vc.server_id))
+  );
+
+drop policy if exists voice_states_write_self on public.voice_states;
+create policy voice_states_write_self on public.voice_states
+  for all using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
 -- reads ---------------------------------------------------------------------
 drop policy if exists channel_reads_own on public.channel_reads;
 create policy channel_reads_own on public.channel_reads
@@ -919,12 +987,23 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values
   ('avatars',       'avatars',       true, 5242880, array['image/png','image/jpeg','image/webp','image/gif']),
   ('server-icons',  'server-icons',  true, 5242880, array['image/png','image/jpeg','image/webp','image/gif']),
-  ('banners',       'banners',       true, 8388608, array['image/png','image/jpeg','image/webp','image/gif'])
+('banners',      'banners',      true, 8388608, array['image/png','image/jpeg','image/webp','image/gif']),
+  ('attachments',  'attachments',  true, 10485760, array['image/png','image/jpeg','image/webp','image/gif','application/pdf','text/plain']))
 on conflict (id) do nothing;
 
 drop policy if exists "avatars are public" on storage.objects;
 create policy "avatars are public" on storage.objects
-  for select using (bucket_id in ('avatars', 'server-icons', 'banners'));
+  for select using (bucket_id in ('avatars', 'server-icons', 'banners', 'attachments'));
+
+drop policy if exists "users upload their own files" on storage.objects;
+create policy "users upload their own files" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'attachments' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "users delete their own files" on storage.objects;
+create policy "users delete their own files" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'attachments' and (storage.foldername(name))[1] = auth.uid()::text);
 
 drop policy if exists "users upload their own avatar" on storage.objects;
 create policy "users upload their own avatar" on storage.objects

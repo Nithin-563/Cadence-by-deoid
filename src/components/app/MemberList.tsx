@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Crown, LogOut, MessageSquare, MoreVertical, Shield, UserMinus, UserPlus } from "lucide-react";
+import { Crown, LogOut, MessageSquare, MoreVertical, Pencil, Shield, UserMinus, UserPlus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/app/Avatar";
@@ -23,11 +23,14 @@ interface MemberListProps {
   basePermissions: number;
   presence: Record<string, PresenceStatus>;
   onlineIds: string[];
+  /** True when the viewer may rename other members. */
+  canRenameOthers?: boolean;
   onOpenProfile: (userId: string) => void;
   onOpenDm: (userId: string) => void;
   onKick: (userId: string) => void;
   onBan: (userId: string) => void;
   onAddFriend: (userId: string) => void;
+  onSetNickname: (userId: string, nickname: string | null) => void;
 }
 
 export function MemberList({
@@ -36,14 +39,15 @@ export function MemberList({
   currentUserId,
   ownerId,
   basePermissions,
-  // Defaults keep a missing prop from turning into a blank screen.
   presence = {},
   onlineIds = [],
+  canRenameOthers = false,
   onOpenProfile,
   onOpenDm,
   onKick,
   onBan,
   onAddFriend,
+  onSetNickname,
 }: MemberListProps) {
   const onlineSet = React.useMemo(() => new Set(onlineIds), [onlineIds]);
   const canModerate = basePermissions === -1 || (basePermissions & (1 << 5)) !== 0;
@@ -164,6 +168,24 @@ export function MemberList({
                         <DropdownMenuItem onSelect={() => onOpenProfile(member.id)}>
                           <Shield className="size-4" /> View profile
                         </DropdownMenuItem>
+                        {member.id !== currentUserId || canRenameOthers ? (
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              const next = window.prompt(
+                                "Nickname (leave blank to clear)",
+                                member.nickname ?? "",
+                              );
+                              if (next === null) return;
+                              const trimmed = next.trim().slice(0, 32);
+                              onSetNickname(
+                                member.id,
+                                trimmed.length === 0 ? null : trimmed,
+                              );
+                            }}
+                          >
+                            <Pencil className="size-4" /> Change nickname
+                          </DropdownMenuItem>
+                        ) : null}
                         {member.id !== currentUserId ? (
                           <DropdownMenuItem onSelect={() => onOpenDm(member.id)}>
                             <MessageSquare className="size-4" /> Send message

@@ -1,26 +1,60 @@
 import * as React from "react";
 import {
   CornerUpLeft,
+  Loader2,
   MoreHorizontal,
+  Paperclip,
   Pencil,
   Pin,
   Reply,
   SmilePlus,
   Trash2,
+  X,
 } from "lucide-react";
 
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/app/Avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMentionHighlight } from "@/hooks/useChatExtras";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import type { Message, Profile, Reaction } from "@/lib/database.types";
+import type { Message, Profile, Reaction, Attachment } from "@/lib/database.types";
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Upload files to the `attachments` bucket and return their public URLs. */
+export async function uploadAttachments(
+  userId: string,
+  channelId: string,
+  files: File[],
+): Promise<Attachment[]> {
+  const out: Attachment[] = [];
+
+  for (const file of files) {
+    const extension = file.name.split(".").pop() ?? "bin";
+    const path = `${userId}/${channelId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+
+    const { error } = await supabase.storage
+      .from("attachments")
+      .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: true });
+    if (error) {
+      console.error("attachment upload failed", error);
+      continue;
+    }
+
+    const { data } = supabase.storage.from("attachments").getPublicUrl(path);
+    out.push({ url: data.publicUrl, name: file.name, type: file.type, size: file.size });
+  }
+
+  return out;
+}
 
 const QUICK_EMOJI = ["👍", "❤️", "😂", "🎉", "👀", "🔥"] as const;
 
@@ -65,6 +99,53 @@ interface MessageItemProps {
   onReact: (messageId: string, emoji: string) => void;
   onTogglePin: (message: Message) => void;
   onOpenProfile: (userId: string) => void;
+}
+
+export function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
+  if (!attachments || attachments.length === 0) return null;
+
+  return (
+    <div className="mt-2 flex max-w-md flex-wrap gap-2">
+      {attachments.map((attachment) => {
+        const isImage = IMAGE_TYPES.includes(attachment.type);
+
+        if (isImage) {
+          return (
+            <a
+              key={attachment.url}
+              href={attachment.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block overflow-hidden rounded-lg border transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <img
+                src={attachment.url}
+                alt={attachment.name}
+                loading="lazy"
+                className="max-h-72 w-auto max-w-full object-contain"
+              />
+            </a>
+          );
+        }
+
+        return (
+          <a
+            key={attachment.url}
+            href={attachment.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex max-w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <Paperclip className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{attachment.name}</span>
+            <span className="shrink-0 text-[11px] text-muted-foreground">
+              {formatBytes(attachment.size)}
+            </span>
+          </a>
+        );
+      })}
+    </div>
+  );
 }
 
 export function MessageItem({
@@ -170,6 +251,8 @@ export function MessageItem({
             )}
           </p>
 
+          <MessageAttachments attachments={message.attachments} />
+
           {grouped.size > 0 ? (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {[...grouped.entries()].map(([emoji, list]) => {
@@ -270,10 +353,14 @@ export interface ComposerProps {
   replyTo: { id: string; content: string; authorName: string } | null;
   /** Present when the user is editing one of their own messages. */
   editing: { id: string; content: string } | null;
+  canAttach?: boolean;
+  uploading?: boolean;
   onCancelReply: () => void;
   onCancelEdit: () => void;
   onSubmit: (content: string) => void | Promise<void>;
   onTyping: () => void;
+  /** Returns the uploaded attachment list, or null if cancelled/failed. */
+  onPickFiles: (files: File[]) => Promise<Attachment[] | null>;
 }
 
 const PALETTE = [
@@ -287,14 +374,20 @@ export function Composer({
   disabledReason,
   replyTo,
   editing,
+  canAttach = true,
+  uploading = false,
   onCancelReply,
   onCancelEdit,
   onSubmit,
   onTyping,
+  onPickFiles,
 }: ComposerProps) {
   const [value, setValue] = React.useState("");
   const [emojiOpen, setEmojiOpen] = React.useState(false);
+  const [pending, setPending] = React.useState<Attachment[]>([]);
+  const [fileError, setFileError] = React.useState<string | null>(null);
   const ref = React.useRef<HTMLTextAreaElement | null>(null);
+  const fileRef = React.useRef<HTMLInputElement | null>(null);
   const isCoarsePointer = useCoarsePointer();
 
   // Seed the field with the text being edited.
@@ -315,9 +408,27 @@ export function Composer({
 
   const submit = () => {
     const trimmed = value.trim();
-    if (!trimmed || disabled) return;
+    // An upload with no caption is still a valid message.
+    if ((!trimmed && pending.length === 0) || disabled || uploading) return;
     void onSubmit(trimmed);
     setValue("");
+    setPending([]);
+  };
+
+  const handleFiles = async (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    setFileError(null);
+
+    const tooBig = list.length > 0 && list[0].size > MAX_ATTACHMENT_BYTES;
+    if (tooBig) {
+      setFileError("That file is over the 10 MB limit.");
+      return;
+    }
+
+    const uploaded = await onPickFiles(Array.from(list));
+    if (uploaded && uploaded.length > 0) {
+      setPending((current) => [...current, ...uploaded]);
+    }
   };
 
   if (disabled) {
@@ -391,6 +502,35 @@ export function Composer({
           <SmilePlus className="size-5 text-muted-foreground sm:size-4" />
         </Button>
 
+        {canAttach ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Attach a file"
+            className="mb-0.5 shrink-0"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+          >
+            {uploading ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            ) : (
+              <Paperclip className="size-4 text-muted-foreground" />
+            )}
+          </Button>
+        ) : null}
+
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          className="sr-only"
+          accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain"
+          onChange={(event) => {
+            void handleFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+
         <Textarea
           ref={ref}
           value={value}
@@ -419,12 +559,41 @@ export function Composer({
         <Button
           size="sm"
           onClick={submit}
-          disabled={!value.trim()}
+          disabled={uploading || (!value.trim() && pending.length === 0)}
           className="mb-0.5 shrink-0 rounded-full px-3 sm:px-4"
         >
           Send
         </Button>
       </div>
+
+      {/* Upload errors and pending attachments */}
+      {fileError ? (
+        <p className="mt-1.5 px-1 text-[11px] text-destructive">{fileError}</p>
+      ) : null}
+
+      {pending.length > 0 ? (
+        <ul className="mt-1.5 flex flex-wrap gap-1.5 px-1">
+          {pending.map((attachment) => (
+            <li
+              key={attachment.url}
+              className="inline-flex max-w-48 items-center gap-1.5 rounded-full border bg-card px-2 py-1 text-[11px]"
+            >
+              <Paperclip className="size-3 shrink-0 text-muted-foreground" />
+              <span className="truncate">{attachment.name}</span>
+              <button
+                type="button"
+                aria-label={`Remove ${attachment.name}`}
+                onClick={() =>
+                  setPending((current) => current.filter((item) => item.url !== attachment.url))
+                }
+                className="shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <p className="mt-1.5 hidden px-1 text-[11px] text-muted-foreground sm:block">
         <strong>Enter</strong> to send · <strong>Shift + Enter</strong> for a new line
       </p>

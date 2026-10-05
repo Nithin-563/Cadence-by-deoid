@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { supabase } from "@/lib/supabase";
-import { rows, row, type Message, type Reaction } from "@/lib/database.types";
+import { rows, row, type Attachment, type Message, type Reaction } from "@/lib/database.types";
 import { useAuth } from "@/hooks/useAuth";
 
 const PAGE_SIZE = 40;
@@ -9,6 +9,7 @@ const PAGE_SIZE = 40;
 export interface SendPayload {
   content: string;
   replyTo?: string | null;
+  attachments?: Attachment[];
 }
 
 export function useMessages(channelId: string | null) {
@@ -176,14 +177,18 @@ export function useMessages(channelId: string | null) {
   }, [channelId, hasMore, messages, fetchPage, loadReactions]);
 
   const send = React.useCallback(
-    async ({ content, replyTo }: SendPayload) => {
-      if (!channelId || !user || !content.trim()) return;
+    async ({ content, replyTo, attachments }: SendPayload) => {
+      if (!channelId || !user) return;
+      const trimmed = content.trim();
+      if (!trimmed && (!attachments || attachments.length === 0)) return;
+
       setSending(true);
       const { error } = await supabase.from("messages").insert({
         channel_id: channelId,
         author_id: user.id,
-        content: content.trim(),
+        content: trimmed,
         reply_to: replyTo ?? null,
+        attachments: attachments ?? [],
       });
       setSending(false);
       if (error) console.error("send failed", error);
@@ -191,13 +196,16 @@ export function useMessages(channelId: string | null) {
     [channelId, user],
   );
 
-  const edit = React.useCallback(async (messageId: string, content: string) => {
-    const { error } = await supabase
-      .from("messages")
-      .update({ content, edited_at: new Date().toISOString() })
-      .eq("id", messageId);
-    if (error) console.error("edit failed", error);
-  }, []);
+  const edit = React.useCallback(
+    async (messageId: string, content: string) => {
+      const { error } = await supabase
+        .from("messages")
+        .update({ content, edited_at: new Date().toISOString() })
+        .eq("id", messageId);
+      if (error) console.error("edit failed", error);
+    },
+    [],
+  );
 
   const remove = React.useCallback(async (messageId: string) => {
     // Soft delete keeps replies intact while hiding the content.

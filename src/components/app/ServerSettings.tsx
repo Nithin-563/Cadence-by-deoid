@@ -124,8 +124,10 @@ function OverviewTab({ server, onChanged }: { server: MyServer; onChanged: () =>
   const [description, setDescription] = React.useState(server.description);
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
+  const [uploadingBanner, setUploadingBanner] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement | null>(null);
+  const bannerRef = React.useRef<HTMLInputElement | null>(null);
 
   const save = async () => {
     setSaving(true);
@@ -176,6 +178,76 @@ function OverviewTab({ server, onChanged }: { server: MyServer; onChanged: () =>
   return (
     <section className="space-y-5 rounded-2xl border bg-card p-6">
       <h2 className="text-sm font-semibold">Server overview</h2>
+
+      {/* Banner */}
+      <div>
+        <p className="mb-1.5 text-xs font-medium text-muted-foreground">Server banner</p>
+        {server.banner_url ? (
+          <div className="relative">
+            <img
+              src={server.banner_url}
+              alt={`${server.name} banner`}
+              className="h-28 w-full rounded-xl border object-cover"
+            />
+            <Button
+              variant="secondary"
+              size="icon-xs"
+              aria-label="Remove banner"
+              className="absolute top-2 right-2"
+              onClick={async () => {
+                const { error } = await supabase
+                  .from("servers")
+                  .update({ banner_url: null })
+                  .eq("id", server.id);
+                if (error) setMessage(error.message);
+                else {
+                  setMessage("Banner removed.");
+                  onChanged();
+                }
+              }}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex h-28 items-center justify-center rounded-xl border border-dashed bg-muted/30">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => bannerRef.current?.click()}
+              disabled={uploadingBanner}
+            >
+              <Camera className="size-4" />
+              {uploadingBanner ? "Uploading…" : "Upload banner"}
+            </Button>
+          </div>
+        )}
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Wide images look best — roughly 1500×500. Up to 8 MB.
+        </p>
+        <input
+          ref={bannerRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void uploadBanner(file);
+          }}
+        />
+        {server.banner_url ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-1.5"
+            onClick={() => bannerRef.current?.click()}
+            disabled={uploadingBanner}
+          >
+            Replace banner
+          </Button>
+        ) : null}
+      </div>
 
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative">
@@ -757,7 +829,42 @@ function MembersTab({
               <div className="flex flex-wrap gap-1.5">
                 {assignable.map((role) => {
                   const active = (memberRoleMap[member.id] ?? []).includes(role.id);
-                  return (
+  const uploadBanner = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setMessage("The banner must be an image file.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setMessage("That image is over the 8 MB limit.");
+      return;
+    }
+
+    setUploadingBanner(true);
+    const extension = file.name.split(".").pop() ?? "png";
+    const path = `${server.id}/banner-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("banners")
+      .upload(path, file, { contentType: file.type, upsert: true });
+
+    if (uploadError) {
+      setUploadingBanner(false);
+      setMessage(`Upload failed: ${uploadError.message}`);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from("banners").getPublicUrl(path);
+    const { error: updateError } = await supabase
+      .from("servers")
+      .update({ banner_url: urlData.publicUrl })
+      .eq("id", server.id);
+
+    setUploadingBanner(false);
+    setMessage(updateError ? updateError.message : "Banner updated.");
+    if (!updateError) onChanged();
+  };
+
+  return (
                     <button
                       key={role.id}
                       type="button"

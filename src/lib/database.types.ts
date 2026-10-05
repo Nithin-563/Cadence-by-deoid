@@ -98,6 +98,7 @@ export interface Message {
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;
+  attachments: Attachment[];
 }
 
 export interface Reaction {
@@ -137,6 +138,32 @@ export interface Pin {
   channel_id: string;
   pinned_by: string | null;
   created_at: string;
+}
+
+export interface VoiceChannel {
+  id: string;
+  server_id: string;
+  name: string;
+  position: number;
+  user_limit: number | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface VoiceState {
+  channel_id: string;
+  user_id: string;
+  session_id: string;
+  self_mute: boolean;
+  self_deaf: boolean;
+  joined_at: string;
+}
+
+export interface Attachment {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
 }
 
 /** A profile decorated with runtime-only presence, used across the UI. */

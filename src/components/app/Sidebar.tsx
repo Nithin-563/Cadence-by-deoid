@@ -10,7 +10,6 @@ import {
   Sun,
   Trash2,
   UserPlus,
-  Volume2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -37,6 +36,8 @@ interface ServerSidebarProps {
   canManageChannels: boolean;
   unreadCounts?: Record<string, number>;
   unreadMentions?: Set<string>;
+  /** Voice block, rendered under the text channels. */
+  children?: React.ReactNode;
   onSelectChannel: (id: string) => void;
   onCreateChannel: () => void;
   onOpenSettings: () => void;
@@ -55,6 +56,7 @@ export function ServerSidebar({
   canManageChannels,
   unreadCounts = {},
   unreadMentions = new Set<string>(),
+  children,
   onSelectChannel,
   onCreateChannel,
   onOpenSettings,
@@ -182,6 +184,10 @@ export function ServerSidebar({
         </section>
 
         <section>
+          {children}
+        </section>
+
+        <section>
           <h2 className="mb-1 px-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
             Server
           </h2>
@@ -190,12 +196,9 @@ export function ServerSidebar({
               <Shield className="size-4 opacity-60" />
               {server.member_role} · {onlineCount} online
             </p>
-            <p className="flex items-start gap-2 pt-1">
-              <Volume2 className="mt-0.5 size-4 shrink-0 opacity-60" />
-              <span className="text-xs leading-relaxed">
-                Voice and video channels land in the next release.
-              </span>
-            </p>
+            {server.description ? (
+              <p className="pt-1 text-xs leading-relaxed">{server.description}</p>
+            ) : null}
           </div>
         </section>
       </div>

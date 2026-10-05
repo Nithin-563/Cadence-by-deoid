@@ -1,5 +1,5 @@
 import * as React from "react";
-import { MessageSquare, Menu, Plus, Users } from "lucide-react";
+import { MessageSquare, Menu, Plus, UserPlus, Users } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import {
@@ -23,13 +23,16 @@ import {
   type DmChannel,
 } from "@/hooks/useCadenceData";
 import { useMessageSearch, usePins } from "@/hooks/useChatExtras";
+import { useVoice } from "@/hooks/useVoice";
+import { useOccupantProfiles, useVoiceChannels } from "@/hooks/useVoiceChannels";
 import { useMessages } from "@/hooks/useMessages";
 import { PERMISSIONS } from "@/lib/permissions";
 
 import { Rail } from "@/components/app/Rail";
 import { DmSidebar, ServerSidebar, UserPanel } from "@/components/app/Sidebar";
-import { Composer, MessageItem, formatDayDivider } from "@/components/app/Chat";
+import { Composer, MessageItem, formatDayDivider, uploadAttachments } from "@/components/app/Chat";
 import { PinsBar, SearchBar } from "@/components/app/ChatExtras";
+import { VoiceChannelList, VoiceError, VoiceStage } from "@/components/app/Voice";
 import { MemberList } from "@/components/app/MemberList";
 import { FriendsView } from "@/components/app/FriendsView";
 import { SettingsView } from "@/components/app/SettingsView";
@@ -108,11 +111,77 @@ export function CadenceApp() {
     [pins.pins],
   );
 
+  /* ------------------------------------------------------------- voice --- */
+
+  const voice = useVoice(user?.id);
+  const {
+    channels: voiceChannels,
+    occupants,
+    create: createVoiceChannel,
+    rename: renameVoiceChannel,
+    remove: removeVoiceChannel,
+    setPresence: setVoicePresence,
+  } = useVoiceChannels(server?.id ?? null);
+  const occupantProfiles = useOccupantProfiles(occupants);
+
+  const occupantProfileMap = React.useMemo(() => {
+    const map = new Map<string, Profile>();
+    for (const profile of occupantProfiles) map.set(profile.id, profile);
+    return map;
+  }, [occupantProfiles]);
+
+  // Mirror the live WebRTC session into voice_states so the sidebar can list
+  // who's in a channel without needing every peer connected.
+  React.useEffect(() => {
+    if (!user?.id) return;
+    const sessionId = voice.channelId ?? "";
+    void setVoicePresence(voice.channelId, sessionId, {
+      muted: voice.muted,
+      deafened: voice.deafened,
+    });
+  }, [voice.channelId, voice.muted, voice.deafened, voice.status, user?.id, setVoicePresence]);
+
+  // Leave the channel when switching server or channel.
+  React.useEffect(() => {
+    if (voice.channelId && server && !voiceChannels.some((c) => c.id === voice.channelId)) {
+      voice.leave();
+    }
+  }, [voiceChannels, voice.channelId, server, voice]);
+
+  const joinVoice = React.useCallback(
+    (channelId: string) => {
+      if (voice.channelId === channelId) {
+        voice.leave();
+        return;
+      }
+      if (voice.channelId) voice.leave();
+      void voice.join(channelId);
+    },
+    [voice],
+  );
+
   // Opening a channel marks it read, which clears its badge.
   React.useEffect(() => {
     if (!activeChannelId || !user?.id) return;
     void markChannelRead(activeChannelId, user.id);
   }, [activeChannelId, user?.id]);
+
+  /* -------------------------------------------------------- attachments --- */
+
+  const [uploading, setUploading] = React.useState(false);
+
+  const pickFiles = React.useCallback(
+    async (files: File[]) => {
+      if (!user?.id || !activeChannelId || files.length === 0) return null;
+      setUploading(true);
+      try {
+        return await uploadAttachments(user.id, activeChannelId, files);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [user?.id, activeChannelId],
+  );
 
   /** Scroll a specific message into view (pins, search results). */
   const jumpToMessage = React.useCallback((messageId: string) => {
@@ -261,6 +330,16 @@ export function CadenceApp() {
     });
   };
 
+  const setNickname = async (userId: string, nickname: string | null) => {
+    if (!server) return;
+    const { error } = await supabase
+      .from("server_members")
+      .update({ nickname })
+      .eq("server_id", server.id)
+      .eq("user_id", userId);
+    if (error) console.error("set nickname failed", error);
+  };
+
   const openUserProfile = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
@@ -310,6 +389,14 @@ export function CadenceApp() {
   // are defensive only — they must never strand the user on a blank screen.
   if (!user || !profile) return <FullPageLoader label="Opening Cadence…" />;
 
+  const onSubmit = React.useCallback(
+    async (content: string, attachments: import("@/lib/database.types").Attachment[]) => {
+      await messageApi.send({ content, replyTo: replyTo?.id ?? null, attachments });
+      setReplyTo(null);
+    },
+    [messageApi, replyTo],
+  );
+
   const selectChannel = (id: string, targetServerId: string | null) => {
     const channel = channels.find((c) => c.id === id);
     const dm = dms.find((entry) => entry.id === id);
@@ -337,8 +424,7 @@ export function CadenceApp() {
           onCreateChannel={() => {
             setCreateChannelOpen(true);
             setSidebarOpen(false);
-          }}
-          onOpenSettings={() => {
+          }}          onOpenSettings={() => {
             setView({ kind: "server-settings", serverId: server.id });
             setSidebarOpen(false);
           }}
@@ -351,7 +437,22 @@ export function CadenceApp() {
           onToggleMembers={() => setMembersVisible((value) => !value)}
           membersVisible={membersVisible}
           onlineCount={members.filter((m) => (presence[m.id] ?? "offline") !== "offline").length}
-        />
+        >
+          <VoiceChannelList
+            channels={voiceChannels}
+            occupants={occupants}
+            profiles={occupantProfileMap}
+            activeVoiceChannelId={voice.channelId}
+            canManage={can("MANAGE_CHANNELS")}
+            onJoin={(channel) => joinVoice(channel.id)}
+            onCreate={() => {
+              const name = window.prompt("Voice channel name", "General voice");
+              if (name?.trim()) void createVoiceChannel(name.trim().slice(0, 64));
+            }}
+            onRename={renameVoiceChannel}
+            onDelete={removeVoiceChannel}
+          />
+        </ServerSidebar>
       ) : (
         <DmSidebar
           dms={dms}
@@ -402,6 +503,8 @@ export function CadenceApp() {
       onKick={(userId) => void kickMember(userId)}
       onBan={(userId) => void banMember(userId)}
       onAddFriend={(userId) => void addFriend(userId)}
+      onSetNickname={(userId, nickname) => void setNickname(userId, nickname)}
+      canRenameOthers={can("CHANGE_NICKNAME")}
     />
   ) : null;
 
@@ -580,6 +683,18 @@ export function CadenceApp() {
                 {server ? (
                   <Button
                     variant="ghost"
+                    size="sm"
+                    className="hidden shrink-0 rounded-full sm:inline-flex"
+                    onClick={() => setInviteOpen(true)}
+                  >
+                    <UserPlus className="size-4" />
+                    Invite
+                  </Button>
+                ) : null}
+
+                {server ? (
+                  <Button
+                    variant="ghost"
                     size="icon-sm"
                     className="lg:hidden"
                     aria-label="Toggle member list"
@@ -644,30 +759,42 @@ export function CadenceApp() {
             </div>
 
             <PinsBar
-              pins={pins.pins}
+              pins={pinsHidden ? [] : pins.pins}
               messages={messageApi.messages}
               authors={profilesById}
               onJump={jumpToMessage}
               onClose={() => setPinsHidden((value) => !value)}
             />
 
+            <VoiceStage
+              voice={voice}
+              profiles={profilesById}
+              myUserId={profile.id}
+              onClose={voice.leave}
+            />
+
+            {voice.status === "failed" && voice.error ? (
+              <VoiceError
+                message={voice.error}
+                onRetry={() => {
+                  if (voice.channelId) void voice.join(voice.channelId);
+                }}
+                onDismiss={voice.leave}
+              />
+            ) : null}
+
             <Composer
               disabled={!channelAllows("SEND_MESSAGES")}
               disabledReason="You don't have permission to send messages in this channel."
+              canAttach={channelAllows("ATTACH_FILES")}
+              uploading={uploading}
               replyTo={replyTo}
               editing={editing}
               onCancelReply={() => setReplyTo(null)}
               onCancelEdit={() => setEditing(null)}
-              onSubmit={async (content) => {
-                if (editing) {
-                  await messageApi.edit(editing.id, content);
-                  setEditing(null);
-                  return;
-                }
-                await messageApi.send({ content, replyTo: replyTo?.id ?? null });
-                setReplyTo(null);
-              }}
+              onSubmit={onSubmit}
               onTyping={notifyTyping}
+              onPickFiles={pickFiles}
             />
           </>
         ) : null}
@@ -939,20 +1066,39 @@ function HomePane({
                   <button
                     type="button"
                     onClick={() => onSelectServer(server.id)}
-                    className="group flex w-full items-center gap-3 rounded-xl border bg-card p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    className="group flex w-full flex-col overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   >
-                    {server.icon_url ? (
-                      <img src={server.icon_url} alt="" className="size-11 shrink-0 rounded-[28%] object-cover" />
+                    {server.banner_url ? (
+                      <img
+                        src={server.banner_url}
+                        alt=""
+                        loading="lazy"
+                        className="h-16 w-full object-cover"
+                      />
                     ) : (
-                      <span className="font-display flex size-11 shrink-0 items-center justify-center rounded-[28%] bg-linear-to-br from-ember-500 to-gold-400 text-lg text-white">
-                        {server.name.slice(0, 2).toUpperCase()}
-                      </span>
+                      <span
+                        aria-hidden="true"
+                        className="h-16 w-full bg-linear-to-r from-ember-500/25 via-gold-400/15 to-teal/20"
+                      />
                     )}
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{server.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {server.member_role}
-                        {server.description ? ` · ${server.description}` : ""}
+                    <span className="flex items-center gap-3 p-3">
+                      {server.icon_url ? (
+                        <img
+                          src={server.icon_url}
+                          alt=""
+                          className="size-11 shrink-0 rounded-[28%] object-cover"
+                        />
+                      ) : (
+                        <span className="font-display flex size-11 shrink-0 items-center justify-center rounded-[28%] bg-linear-to-br from-ember-500 to-gold-400 text-lg text-white">
+                          {server.name.slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{server.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {server.member_role}
+                          {server.description ? ` · ${server.description}` : ""}
+                        </span>
                       </span>
                     </span>
                   </button>
