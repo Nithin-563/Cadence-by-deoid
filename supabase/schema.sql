@@ -985,10 +985,10 @@ end $$;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values
-  ('avatars',       'avatars',       true, 5242880, array['image/png','image/jpeg','image/webp','image/gif']),
-  ('server-icons',  'server-icons',  true, 5242880, array['image/png','image/jpeg','image/webp','image/gif']),
-('banners',      'banners',      true, 8388608, array['image/png','image/jpeg','image/webp','image/gif']),
-  ('attachments',  'attachments',  true, 10485760, array['image/png','image/jpeg','image/webp','image/gif','application/pdf','text/plain']))
+  ('avatars',      'avatars',      true,  5242880, array['image/png','image/jpeg','image/webp','image/gif']),
+  ('server-icons', 'server-icons', true,  5242880, array['image/png','image/jpeg','image/webp','image/gif']),
+  ('banners',      'banners',      true,  8388608, array['image/png','image/jpeg','image/webp','image/gif']),
+  ('attachments',  'attachments',  true, 10485760, array['image/png','image/jpeg','image/webp','image/gif','application/pdf','text/plain'])
 on conflict (id) do nothing;
 
 drop policy if exists "avatars are public" on storage.objects;

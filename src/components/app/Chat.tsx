@@ -363,7 +363,7 @@ export interface ComposerProps {
   uploading?: boolean;
   onCancelReply: () => void;
   onCancelEdit: () => void;
-  onSubmit: (content: string) => void | Promise<void>;
+  onSubmit: (content: string, attachments: Attachment[]) => void | Promise<void>;
   onTyping: () => void;
   /** Returns the uploaded attachment list, or null if cancelled/failed. */
   onPickFiles: (files: File[]) => Promise<Attachment[] | null>;
@@ -416,7 +416,7 @@ export function Composer({
     const trimmed = value.trim();
     // An upload with no caption is still a valid message.
     if ((!trimmed && pending.length === 0) || disabled || uploading) return;
-    void onSubmit(trimmed);
+    void onSubmit(trimmed, pending);
     setValue("");
     setPending([]);
   };

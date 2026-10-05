@@ -1,5 +1,5 @@
 import * as React from "react";
-import { MessageSquare, Menu, Plus, UserPlus, Users } from "lucide-react";
+import { AlertTriangle, MessageSquare, Menu, Plus, UserPlus, Users, X } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import {
@@ -390,12 +390,28 @@ export function CadenceApp() {
   // are defensive only — they must never strand the user on a blank screen.
   if (!user || !profile) return <FullPageLoader label="Opening Cadence…" />;
 
+  // Errors are surfaced in the UI rather than only logged: a silent insert
+  // failure looks exactly like "Send does nothing".
+  const [sendError, setSendError] = React.useState<string | null>(null);
+
   const onSubmit = React.useCallback(
-    async (content: string, attachments: import("@/lib/database.types").Attachment[]) => {
-      await messageApi.send({ content, replyTo: replyTo?.id ?? null, attachments });
-      setReplyTo(null);
+    async (content: string, attachments: Attachment[]) => {
+      setSendError(null);
+      try {
+        if (editing) {
+          await messageApi.edit(editing.id, content);
+          setEditing(null);
+          return;
+        }
+        await messageApi.send({ content, replyTo: replyTo?.id ?? null, attachments });
+        setReplyTo(null);
+      } catch (caught) {
+        setSendError(
+          caught instanceof Error ? caught.message : "Your message could not be sent.",
+        );
+      }
     },
-    [messageApi, replyTo],
+    [messageApi, replyTo, editing],
   );
 
   const selectChannel = (id: string, targetServerId: string | null) => {
@@ -783,6 +799,24 @@ export function CadenceApp() {
                 }}
                 onDismiss={voice.leave}
               />
+            ) : null}
+
+            {sendError ? (
+              <div
+                role="alert"
+                className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 sm:mx-4"
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                <p className="min-w-0 flex-1 text-sm text-foreground/85">{sendError}</p>
+                <button
+                  type="button"
+                  onClick={() => setSendError(null)}
+                  aria-label="Dismiss"
+                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
             ) : null}
 
             <Composer

@@ -5,7 +5,6 @@ import { rows, row, type Attachment, type Message, type Reaction } from "@/lib/d
 import { useAuth } from "@/hooks/useAuth";
 
 const PAGE_SIZE = 40;
-
 export interface SendPayload {
   content: string;
   replyTo?: string | null;
@@ -191,7 +190,24 @@ export function useMessages(channelId: string | null) {
         attachments: attachments ?? [],
       });
       setSending(false);
-      if (error) console.error("send failed", error);
+
+      // Rethrow so the composer can show it — a failed send that only logs to
+      // the console is indistinguishable from Send doing nothing.
+      if (error) {
+        console.error("send failed", error);
+        const text = `${error.message} ${error.code ?? ""}`.toLowerCase();
+        if (text.includes("row-level security") || error.code === "42501") {
+          throw new Error(
+            "The database refused that message. You may not have permission to post here, or the schema needs updating.",
+          );
+        }
+        if (text.includes("does not exist") || error.code === "PGRST205") {
+          throw new Error(
+            "The messages table is missing. Re-run supabase/schema.sql in your Supabase SQL editor.",
+          );
+        }
+        throw new Error(`Couldn't send: ${error.message}`);
+      }
     },
     [channelId, user],
   );
