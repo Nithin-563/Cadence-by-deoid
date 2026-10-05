@@ -1,7 +1,7 @@
 import * as React from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured, testConnection, type ConnectionResult } from "@/lib/supabase";
 import { row, type Profile } from "@/lib/database.types";
 
 export type AuthStatus = "loading" | "ready" | "error";
@@ -14,6 +14,9 @@ interface AuthContextValue {
   /** Human-readable reason when `status` is "error". */
   error: string | null;
   configured: boolean;
+  /** Result of the startup health check against Supabase, once it has run. */
+  connection: ConnectionResult | null;
+  recheckConnection: () => void;
   signUp: (input: SignUpInput) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -75,8 +78,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = React.useState<AuthStatus>("loading");
   const [error, setError] = React.useState<string | null>(null);
   const [reloadToken, setReloadToken] = React.useState(0);
+  const [connection, setConnection] = React.useState<ConnectionResult | null>(null);
 
   const retry = React.useCallback(() => setReloadToken((token) => token + 1), []);
+  const recheckConnection = React.useCallback(() => setConnection(null), []);
+
+  // Health check, so a wrong key or a missing schema is visible immediately
+  // instead of surfacing as a mysterious failed login.
+  React.useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let active = true;
+    void testConnection().then((result) => {
+      if (active) setConnection(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
 
   /* ------------------------------------------------------------- session --- */
   // Deliberately does NOT touch any other Supabase method inside the callback —
@@ -192,6 +210,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       status,
       error,
       configured: isSupabaseConfigured,
+      connection,
+      recheckConnection,
       async signUp({ email, password, username, displayName }) {
         const { error: signUpError } = await supabase.auth.signUp({
           email,
@@ -229,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       retry,
     }),
-    [session, profile, status, error, retry],
+    [session, profile, status, error, connection, retry, recheckConnection],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

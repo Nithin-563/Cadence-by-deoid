@@ -48,3 +48,65 @@ export const supabase = createClient(url, anonKey, {
     params: { eventsPerSecond: 10 },
   },
 });
+
+export interface ConnectionResult {
+  ok: boolean;
+  /** Which part of the setup is wrong, when we can tell. */
+  problem: "invalid-key" | "no-schema" | "network" | "unknown";
+  detail: string;
+}
+
+/**
+ * Probe the project so misconfiguration shows up as a clear banner instead of
+ * a generic "Invalid login credentials" or a loading screen that never ends.
+ *
+ * A single read against `profiles` tells us a lot:
+ *   - 401 / "Invalid API key" -> the anon key is wrong or rotated
+ *   - 404 / "relation ... does not exist" -> schema.sql has not been run
+ *   - anything else -> surfaced verbatim
+ */
+export async function testConnection(): Promise<ConnectionResult> {
+  try {
+    const { data, error } = await supabase.from("profiles").select("id").limit(1);
+
+    if (!error) {
+      return { ok: true, problem: "unknown", detail: `Connected to ${url}` };
+    }
+
+    const text = `${error.message} ${error.code ?? ""}`.toLowerCase();
+
+    if (text.includes("invalid api key") || text.includes("apikey")) {
+      return {
+        ok: false,
+        problem: "invalid-key",
+        detail:
+          "Supabase rejected this project's anon key. Copy the current one from Project Settings → API and update VITE_SUPABASE_ANON_KEY (and DEFAULT_ANON_KEY in src/lib/supabase.ts).",
+      };
+    }
+
+    if (text.includes("does not exist") || text.includes("schema cache")) {
+      return {
+        ok: false,
+        problem: "no-schema",
+        detail:
+          "The project has no `profiles` table yet. Run supabase/schema.sql in the SQL editor.",
+      };
+    }
+
+    if (text.includes("failed to fetch") || text.includes("network")) {
+      return {
+        ok: false,
+        problem: "network",
+        detail: `Could not reach ${url}. Check your connection.`,
+      };
+    }
+
+    return { ok: false, problem: "unknown", detail: error.message };
+  } catch (caught) {
+    return {
+      ok: false,
+      problem: "network",
+      detail: caught instanceof Error ? caught.message : "Could not reach Supabase.",
+    };
+  }
+}

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Loader2, LogIn, Mail, UserPlus } from "lucide-react";
+import { AlertTriangle, Loader2, LogIn, Mail, RefreshCw, UserPlus } from "lucide-react";
 
 import { useSeoMeta } from "@unhead/react";
 
@@ -27,7 +27,8 @@ export default function Login() {
   });
 
   const navigate = useNavigate();
-  const { signIn, signUp, signInWithGoogle, user, configured } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user, configured, connection, recheckConnection } =
+    useAuth();
 
   const [mode, setMode] = React.useState<Mode>("signup");
   const [email, setEmail] = React.useState("");
@@ -132,6 +133,29 @@ export default function Login() {
               ? "Pick a username — it's how people will find you on Cadence."
               : "Sign in to pick up where you left off."}
           </p>
+
+          {connection && !connection.ok ? (
+          <div
+            role="alert"
+            className="mt-6 rounded-xl border border-destructive/40 bg-destructive/10 p-4"
+          >
+            <p className="flex items-center gap-2 text-sm font-semibold text-destructive">
+              <AlertTriangle className="size-4 shrink-0" />
+              Can't reach Supabase
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-foreground/80">
+              {connection.detail}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 rounded-full"
+              onClick={recheckConnection}
+            >
+              <RefreshCw className="size-4" /> Check again
+            </Button>
+          </div>
+        ) : null}
 
           {error ? (
             <p
