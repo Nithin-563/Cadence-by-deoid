@@ -121,6 +121,7 @@ export function CadenceApp() {
     rename: renameVoiceChannel,
     remove: removeVoiceChannel,
     setPresence: setVoicePresence,
+    schemaMissing: voiceSchemaMissing,
   } = useVoiceChannels(server?.id ?? null);
   const occupantProfiles = useOccupantProfiles(occupants);
 
@@ -444,6 +445,7 @@ export function CadenceApp() {
             profiles={occupantProfileMap}
             activeVoiceChannelId={voice.channelId}
             canManage={can("MANAGE_CHANNELS")}
+            schemaMissing={voiceSchemaMissing}
             onJoin={(channel) => joinVoice(channel.id)}
             onCreate={() => {
               const name = window.prompt("Voice channel name", "General voice");

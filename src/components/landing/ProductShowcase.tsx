@@ -267,37 +267,3 @@ export function CapabilityGrid({
     </ul>
   );
 }
-
-/** Big call-to-action panel, reused by the hero and the footer. */
-export function CallToAction({
-  title,
-  body,
-  primary = { label: "Open Cadence", to: "/app" },
-  secondary = { label: "Create an account", to: "/login" },
-}: {
-  title: string;
-  body: string;
-  primary?: { label: string; to: string };
-  secondary?: { label: string; to: string };
-}) {
-  return (
-    <div className="flex flex-col items-center gap-4 text-center">
-      <div>
-        <h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-          {title}
-        </h2>
-        <p className="mx-auto mt-2 max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
-          {body}
-        </p>
-      </div>
-      <div className="flex flex-col gap-2.5 sm:flex-row">
-        <Button asChild className="rounded-full">
-          <Link to={primary.to}>{primary.label}</Link>
-        </Button>
-        <Button asChild variant="outline" className="rounded-full">
-          <Link to={secondary.to}>{secondary.label}</Link>
-        </Button>
-      </div>
-    </div>
-  );
-}

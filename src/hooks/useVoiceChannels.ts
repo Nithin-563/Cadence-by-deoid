@@ -10,6 +10,8 @@ export function useVoiceChannels(serverId: string | null) {
   const [channels, setChannels] = React.useState<VoiceChannel[]>([]);
   const [occupants, setOccupants] = React.useState<Record<string, VoiceOccupant[]>>({});
   const [loading, setLoading] = React.useState(true);
+  /** True when the voice schema hasn't been applied to the project yet. */
+  const [schemaMissing, setSchemaMissing] = React.useState(false);
 
   const reload = React.useCallback(async () => {
     if (!serverId) {
@@ -28,7 +30,17 @@ export function useVoiceChannels(serverId: string | null) {
       supabase.from("voice_states").select("*"),
     ]);
 
-    if (channelRes.error) console.error("voice_channels failed", channelRes.error);
+    if (channelRes.error) {
+      console.error("voice_channels failed", channelRes.error);
+      // PGRST205 means the table doesn't exist — the voice migration hasn't
+      // been applied. Surface that instead of looking like "no channels".
+      setSchemaMissing(
+        channelRes.error.code === "PGRST205" ||
+          channelRes.error.message.toLowerCase().includes("does not exist"),
+      );
+    } else {
+      setSchemaMissing(false);
+    }
 
     const list = rows<VoiceChannel>(channelRes.data);
     setChannels(list);
@@ -126,7 +138,7 @@ export function useVoiceChannels(serverId: string | null) {
     await supabase.from("voice_channels").delete().eq("id", id);
   }, []);
 
-  return { channels, occupants, loading, reload, setPresence, create, rename, remove };
+  return { channels, occupants, loading, schemaMissing, reload, setPresence, create, rename, remove };
 }
 
 export interface VoiceOccupant {

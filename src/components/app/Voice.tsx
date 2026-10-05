@@ -29,6 +29,7 @@ export function VoiceChannelList({
   profiles,
   activeVoiceChannelId,
   canManage,
+  schemaMissing = false,
   onJoin,
   onCreate,
   onRename,
@@ -39,6 +40,7 @@ export function VoiceChannelList({
   profiles: Map<string, Profile>;
   activeVoiceChannelId: string | null;
   canManage: boolean;
+  schemaMissing?: boolean;
   onJoin: (channel: VoiceChannel) => void;
   onCreate: () => void;
   onRename: (id: string, name: string) => void;
@@ -54,7 +56,7 @@ export function VoiceChannelList({
           <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
             Voice channels
           </h2>
-          {canManage ? (
+          {canManage && !schemaMissing ? (
             <button
               type="button"
               onClick={() => setCreating(true)}
@@ -65,11 +67,28 @@ export function VoiceChannelList({
             </button>
           ) : null}
         </div>
-        <p className="px-2 text-[13px] text-muted-foreground">
-          No voice channels yet.
-          {canManage ? " Create one to start talking." : ""}
-        </p>
-        {canManage ? <CreateRow name={name} setName={setName} onCreate={onCreate} onCancel={() => setCreating(false)} /> : null}
+
+        {schemaMissing ? (
+          <p className="rounded-lg border border-dashed px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground">
+            Voice isn&rsquo;t set up on this Supabase project yet. Run the voice section of{" "}
+            <span className="font-mono">supabase/schema.sql</span> to enable it.
+          </p>
+        ) : (
+          <>
+            <p className="px-2 text-[13px] text-muted-foreground">
+              No voice channels yet.
+              {canManage ? " Create one to start talking." : ""}
+            </p>
+            {canManage ? (
+              <CreateRow
+                name={name}
+                setName={setName}
+                onCreate={onCreate}
+                onCancel={() => setCreating(false)}
+              />
+            ) : null}
+          </>
+        )}
       </section>
     );
   }

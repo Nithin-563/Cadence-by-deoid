@@ -17,6 +17,12 @@ import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/app/Avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMentionHighlight } from "@/hooks/useChatExtras";
 import type { Message, Profile, Reaction, Attachment } from "@/lib/database.types";
 
