@@ -1,10 +1,19 @@
 import * as React from "react";
-import { CornerUpLeft, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
+import {
+  CornerUpLeft,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  Reply,
+  SmilePlus,
+  Trash2,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/app/Avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useMentionHighlight } from "@/hooks/useChatExtras";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,12 +55,15 @@ interface MessageItemProps {
   replyAuthor: Profile | null;
   reactions: Reaction[];
   currentUserId: string;
+  currentUsername?: string;
   canManage: boolean;
   showHeader: boolean;
+  pinned?: boolean;
   onReply: (message: Message) => void;
   onEdit: (message: Message) => void;
   onDelete: (message: Message) => void;
   onReact: (messageId: string, emoji: string) => void;
+  onTogglePin: (message: Message) => void;
   onOpenProfile: (userId: string) => void;
 }
 
@@ -62,12 +74,15 @@ export function MessageItem({
   replyAuthor,
   reactions,
   currentUserId,
+  currentUsername,
   canManage,
   showHeader,
+  pinned,
   onReply,
   onEdit,
   onDelete,
   onReact,
+  onTogglePin,
   onOpenProfile,
 }: MessageItemProps) {
   const grouped = reactions.reduce<Map<string, Reaction[]>>((map, reaction) => {
@@ -79,16 +94,19 @@ export function MessageItem({
 
   const name = author?.display_name ?? "Unknown member";
   const isMine = message.author_id === currentUserId;
+  const segments = useMentionHighlight(message.content, currentUsername);
 
   return (
     <div
       className={cn(
-        "group relative px-4 py-0.5 transition-colors hover:bg-foreground/[0.03]",
+        "group relative px-3 py-0.5 transition-colors hover:bg-foreground/[0.03] sm:px-4",
         showHeader && "mt-3",
+        pinned && "bg-gold-400/8",
       )}
+      id={message.id}
     >
-      <div className="flex gap-3">
-        <div className="w-10 shrink-0">
+      <div className="flex gap-2.5 sm:gap-3">
+        <div className="w-8 shrink-0 sm:w-10">
           {showHeader ? (
             <button
               type="button"
@@ -103,7 +121,7 @@ export function MessageItem({
 
         <div className="min-w-0 flex-1 pb-0.5">
           {showHeader ? (
-            <div className="flex items-baseline gap-2">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <button
                 type="button"
                 onClick={() => onOpenProfile(message.author_id)}
@@ -121,6 +139,11 @@ export function MessageItem({
               {message.edited_at ? (
                 <span className="text-[10px] text-muted-foreground/80">(edited)</span>
               ) : null}
+              {pinned ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gold-600 dark:text-gold-400">
+                  <Pin className="size-3" /> pinned
+                </span>
+              ) : null}
             </div>
           ) : null}
 
@@ -133,7 +156,18 @@ export function MessageItem({
           ) : null}
 
           <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
-            {message.content}
+            {segments.map((segment, index) =>
+              segment.mention ? (
+                <span
+                  key={index}
+                  className="rounded bg-primary/15 px-0.5 font-medium text-foreground"
+                >
+                  {segment.text}
+                </span>
+              ) : (
+                <span key={index}>{segment.text}</span>
+              ),
+            )}
           </p>
 
           {grouped.size > 0 ? (
@@ -165,8 +199,8 @@ export function MessageItem({
         </div>
       </div>
 
-      {/* Hover toolbar */}
-      <div className="absolute -top-3 right-4 flex items-center gap-0.5 rounded-md border border-border bg-card p-0.5 opacity-0 shadow-md transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+      {/* Hover toolbar — hidden on touch, where it would fight with scrolling */}
+      <div className="absolute -top-3 right-3 hidden items-center gap-0.5 rounded-md border border-border bg-card p-0.5 opacity-0 shadow-md transition-opacity focus-within:opacity-100 group-hover:opacity-100 sm:flex">
         <Button
           variant="ghost"
           size="icon-xs"
@@ -209,6 +243,11 @@ export function MessageItem({
               {isMine ? (
                 <DropdownMenuItem onSelect={() => onEdit(message)}>
                   <Pencil className="size-4" /> Edit message
+                </DropdownMenuItem>
+              ) : null}
+              {canManage ? (
+                <DropdownMenuItem onSelect={() => onTogglePin(message)}>
+                  <Pin className="size-4" /> {pinned ? "Unpin message" : "Pin message"}
                 </DropdownMenuItem>
               ) : null}
               <DropdownMenuItem variant="destructive" onSelect={() => onDelete(message)}>
@@ -256,6 +295,7 @@ export function Composer({
   const [value, setValue] = React.useState("");
   const [emojiOpen, setEmojiOpen] = React.useState(false);
   const ref = React.useRef<HTMLTextAreaElement | null>(null);
+  const isCoarsePointer = useCoarsePointer();
 
   // Seed the field with the text being edited.
   React.useEffect(() => {
@@ -282,7 +322,7 @@ export function Composer({
 
   if (disabled) {
     return (
-      <div className="px-4 pb-6">
+      <div className="px-3 pb-4 sm:px-4 sm:pb-6">
         <div className="rounded-lg border border-dashed bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground">
           {disabledReason ?? "You don't have permission to send messages here."}
         </div>
@@ -291,7 +331,7 @@ export function Composer({
   }
 
   return (
-    <div className="relative px-4 pb-6">
+    <div className="relative px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-4 sm:pb-6">
       {emojiOpen ? (
         <>
           {/* Click-outside catcher */}
@@ -335,19 +375,20 @@ export function Composer({
 
       <div
         className={cn(
-          "flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm",
+          "flex items-end gap-1 rounded-2xl border border-border bg-card px-2 py-1.5 shadow-sm sm:gap-2 sm:px-3 sm:py-2",
           "focus-within:border-foreground/30",
           (editing || replyTo) && "rounded-t-none",
         )}
       >
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="icon"
           aria-label="Insert emoji"
           aria-expanded={emojiOpen}
+          className="mb-0.5 shrink-0"
           onClick={() => setEmojiOpen((value) => !value)}
         >
-          <SmilePlus className="size-5 text-muted-foreground" />
+          <SmilePlus className="size-5 text-muted-foreground sm:size-4" />
         </Button>
 
         <Textarea
@@ -358,7 +399,7 @@ export function Composer({
             onTyping();
           }}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey && !isCoarsePointer) {
               event.preventDefault();
               submit();
             }
@@ -371,21 +412,41 @@ export function Composer({
           rows={1}
           placeholder={editing ? "Edit your message…" : "Message"}
           aria-label="Message input"
-          className="max-h-[220px] min-h-9 resize-none border-0 bg-transparent px-0 py-1.5 text-[15px] shadow-none focus-visible:ring-0 dark:bg-transparent md:text-[15px]"
+          enterKeyHint="send"
+          className="max-h-[40vh] min-h-10 resize-none border-0 bg-transparent px-1 py-2 text-[16px] shadow-none focus-visible:ring-0 md:text-[15px] sm:min-h-9 sm:py-1.5 sm:text-[15px] dark:bg-transparent"
         />
 
         <Button
           size="sm"
           onClick={submit}
           disabled={!value.trim()}
-          className="mb-0.5 rounded-full px-4"
+          className="mb-0.5 shrink-0 rounded-full px-3 sm:px-4"
         >
           Send
         </Button>
       </div>
-      <p className="mt-1.5 px-1 text-[11px] text-muted-foreground">
+      <p className="mt-1.5 hidden px-1 text-[11px] text-muted-foreground sm:block">
         <strong>Enter</strong> to send · <strong>Shift + Enter</strong> for a new line
       </p>
     </div>
   );
+}
+
+/**
+ * On touch devices Enter should insert a newline, not send — otherwise the
+ * send button is unreachable and a stray tap loses a half-typed message.
+ */
+function useCoarsePointer(): boolean {
+  const [coarse, setCoarse] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia("(pointer: coarse)");
+    setCoarse(query.matches);
+    const onChange = (event: MediaQueryListEvent) => setCoarse(event.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  return coarse;
 }

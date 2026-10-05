@@ -7,7 +7,9 @@ import type { MyServer, PresenceStatus } from "@/lib/database.types";
 interface RailProps {
   servers: MyServer[];
   activeServerId: string | null;
-  unreadByServer: Record<string, number>;
+  unreadByServer?: Record<string, number>;
+  /** "vertical" is the desktop rail; "horizontal" is the mobile bottom bar. */
+  orientation?: "vertical" | "horizontal";
   onSelectHome: () => void;
   onSelectFriends: () => void;
   onSelectServer: (id: string) => void;
@@ -22,25 +24,45 @@ function Tile({
   active,
   onClick,
   label,
+  orientation,
   children,
   indicator,
 }: {
   active?: boolean;
   onClick: () => void;
   label: string;
+  orientation: "vertical" | "horizontal";
   children: React.ReactNode;
   indicator?: number;
 }) {
+  const vertical = orientation === "vertical";
+
   return (
-    <div className="group relative flex justify-center">
-      {/* Active pill sits outside the tile, like Discord's rail indicator. */}
-      <span
-        aria-hidden="true"
-        className={cn(
-          "absolute top-1/2 -left-3 h-8 w-1 -translate-y-1/2 rounded-r-full bg-foreground transition-all duration-200",
-          active ? "opacity-100" : "scale-y-0 opacity-0 group-hover:scale-y-75 group-hover:opacity-40",
-        )}
-      />
+    <div
+      className={cn(
+        "group relative flex justify-center",
+        vertical ? "" : "flex-1 shrink-0",
+      )}
+    >
+      {/* Active pill: left edge on desktop, bottom edge on mobile. */}
+      {vertical ? (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute top-1/2 -left-3 h-8 w-1 -translate-y-1/2 rounded-r-full bg-foreground transition-all duration-200",
+            active ? "opacity-100" : "scale-y-0 opacity-0 group-hover:scale-y-75 group-hover:opacity-40",
+          )}
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute inset-x-1 -top-1 h-1 rounded-full bg-foreground transition-opacity duration-200",
+            active ? "opacity-100" : "opacity-0 group-hover:opacity-40",
+          )}
+        />
+      )}
+
       <button
         type="button"
         onClick={onClick}
@@ -48,10 +70,13 @@ function Tile({
         aria-label={label}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "relative flex size-12 items-center justify-center overflow-hidden rounded-[28%] transition-all duration-200",
+          "relative flex items-center justify-center overflow-hidden transition-all duration-200",
           "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-          "hover:rounded-2xl",
-          active ? "rounded-2xl ring-2 ring-foreground/80" : "ring-1 ring-border",
+          vertical
+            ? "size-12 rounded-[28%] hover:rounded-2xl"
+            : "size-11 rounded-2xl",
+          active && (vertical ? "rounded-2xl ring-2 ring-foreground/80" : "bg-foreground/10"),
+          !active && vertical && "ring-1 ring-border",
         )}
       >
         {children}
@@ -68,11 +93,12 @@ function Tile({
   );
 }
 
-/** Left icon rail: home, friends, DM shortcut, then one tile per server. */
+/** Server rail. Vertical on desktop, a scrollable bottom bar on mobile. */
 export function Rail({
   servers,
   activeServerId,
   unreadByServer = {},
+  orientation = "vertical",
   onSelectHome,
   onSelectFriends,
   onSelectServer,
@@ -82,20 +108,29 @@ export function Rail({
   profile,
   status,
 }: RailProps) {
+  const vertical = orientation === "vertical";
+
   return (
     <nav
       aria-label="Servers"
-      className="flex w-[4.5rem] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-border/70 bg-muted/50 py-3"
+      className={cn(
+        vertical
+          ? "flex w-[4.5rem] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-border/70 bg-muted/50 py-3"
+          : "flex w-full items-center gap-1 overflow-x-auto border-t border-border/70 bg-muted/60 px-2 py-1.5",
+      )}
     >
-      <Tile onClick={onSelectHome} label="Home">
+      <Tile onClick={onSelectHome} label="Home" orientation={orientation}>
         <HomeGlyph />
       </Tile>
 
-      <Tile onClick={onSelectFriends} label="Friends">
+      <Tile onClick={onSelectFriends} label="Friends" orientation={orientation}>
         <FriendsGlyph />
       </Tile>
 
-      <div aria-hidden="true" className="my-1 h-0.5 w-8 rounded-full bg-border" />
+      <div
+        aria-hidden="true"
+        className={cn("rounded-full bg-border", vertical ? "my-1 h-0.5 w-8" : "mx-1 h-6 w-0.5")}
+      />
 
       {servers.map((server) => (
         <Tile
@@ -103,36 +138,42 @@ export function Rail({
           active={activeServerId === server.id}
           onClick={() => onSelectServer(server.id)}
           label={server.name}
+          orientation={orientation}
           indicator={unreadByServer[server.id]}
         >
           {server.icon_url ? (
-            <img
-              src={server.icon_url}
-              alt=""
-              className="size-full object-cover"
-              draggable={false}
-            />
+            <img src={server.icon_url} alt="" className="size-full object-cover" draggable={false} />
           ) : (
-            <span className="font-display flex size-full items-center justify-center bg-linear-to-br from-ember-500 to-gold-400 text-lg text-white">
+            <span
+              className={cn(
+                "font-display flex size-full items-center justify-center bg-linear-to-br from-ember-500 to-gold-400 text-white",
+                vertical ? "text-lg" : "text-base",
+              )}
+            >
               {server.name.slice(0, 2).toUpperCase()}
             </span>
           )}
         </Tile>
       ))}
 
-      <Tile onClick={onCreateServer} label="Create a server">
-        <span className="flex size-full items-center justify-center bg-foreground/8 text-foreground transition-colors group-hover:bg-foreground group-hover:text-background">
+      <Tile onClick={onCreateServer} label="Create a server" orientation={orientation}>
+        <span
+          className={cn(
+            "flex size-full items-center justify-center bg-foreground/8 text-foreground transition-colors",
+            vertical && "group-hover:bg-foreground group-hover:text-background",
+          )}
+        >
           <PlusGlyph />
         </span>
       </Tile>
 
-      <Tile onClick={onJoinServer} label="Join a server with an invite">
+      <Tile onClick={onJoinServer} label="Join a server with an invite" orientation={orientation}>
         <span className="flex size-full items-center justify-center bg-foreground/8 text-foreground">
           <LinkGlyph />
         </span>
       </Tile>
 
-      <div className="mt-auto pt-2">
+      <div className={cn(vertical ? "mt-auto pt-2" : "ml-auto pl-1")}>
         <button
           type="button"
           onClick={onOpenProfile}
@@ -144,7 +185,7 @@ export function Rail({
             seed={profile?.id ?? "me"}
             name={profile?.display_name ?? "You"}
             src={profile?.avatar_url}
-            size={40}
+            size={vertical ? 40 : 36}
             status={status}
             showStatus
           />

@@ -132,6 +132,13 @@ export interface ChannelRead {
   last_read_at: string;
 }
 
+export interface Pin {
+  message_id: string;
+  channel_id: string;
+  pinned_by: string | null;
+  created_at: string;
+}
+
 /** A profile decorated with runtime-only presence, used across the UI. */
 export interface ProfileWithPresence extends Profile {
   presence: PresenceStatus;

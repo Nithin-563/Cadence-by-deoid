@@ -35,6 +35,8 @@ interface ServerSidebarProps {
   channels: Channel[];
   activeChannelId: string | null;
   canManageChannels: boolean;
+  unreadCounts?: Record<string, number>;
+  unreadMentions?: Set<string>;
   onSelectChannel: (id: string) => void;
   onCreateChannel: () => void;
   onOpenSettings: () => void;
@@ -51,6 +53,8 @@ export function ServerSidebar({
   channels,
   activeChannelId,
   canManageChannels,
+  unreadCounts = {},
+  unreadMentions = new Set<string>(),
   onSelectChannel,
   onCreateChannel,
   onOpenSettings,
@@ -124,6 +128,8 @@ export function ServerSidebar({
           <ul className="space-y-0.5">
             {textChannels.map((channel) => {
               const active = channel.id === activeChannelId;
+              const unread = active ? 0 : (unreadCounts[channel.id] ?? 0);
+              const mentioned = !active && unreadMentions.has(channel.id);
               return (
                 <li key={channel.id}>
                   <button
@@ -131,20 +137,38 @@ export function ServerSidebar({
                     onClick={() => onSelectChannel(channel.id)}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "group flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[15px] transition-colors",
+                      "group flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-left text-[15px] transition-colors",
                       "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                      active
-                        ? "bg-foreground/10 font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                      mentioned
+                        ? "bg-primary/12 font-medium text-foreground"
+                        : unread > 0
+                          ? "font-medium text-foreground"
+                          : active
+                            ? "bg-foreground/10 font-medium text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                     )}
                   >
                     <Hash
                       className={cn(
                         "size-4 shrink-0",
-                        active ? "text-muted-foreground" : "opacity-40 group-hover:opacity-70",
+                        active || unread > 0
+                          ? "text-muted-foreground"
+                          : "opacity-40 group-hover:opacity-70",
                       )}
                     />
                     <span className="truncate">{channel.name}</span>
+                    {unread > 0 ? (
+                      <span
+                        className={cn(
+                          "ml-auto shrink-0 rounded-full px-1.5 text-[10px] leading-4 font-bold tabular-nums",
+                          mentioned
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-foreground/15 text-foreground",
+                        )}
+                      >
+                        {unread > 99 ? "99+" : unread}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );
@@ -188,6 +212,8 @@ interface DmSidebarProps {
   onlineIds: string[];
   presence: Record<string, PresenceStatus>;
   activeChannelId: string | null;
+  unreadCounts?: Record<string, number>;
+  unreadMentions?: Set<string>;
   onSelectDm: (id: string) => void;
   onSelectFriends: () => void;
   onOpenProfile: (userId: string) => void;
@@ -199,6 +225,8 @@ export function DmSidebar({
   pendingCount,
   presence = {},
   onlineIds = [],
+  unreadCounts = {},
+  unreadMentions = new Set<string>(),
   activeChannelId,
   onSelectDm,
   onSelectFriends,
@@ -270,6 +298,8 @@ export function DmSidebar({
           <ul className="space-y-0.5">
             {dms.map((dm) => {
               const active = dm.id === activeChannelId;
+              const unread = active ? 0 : (unreadCounts[dm.id] ?? 0);
+              const mentioned = !active && unreadMentions.has(dm.id);
               const status = dm.partner
                 ? (presence[dm.partner.id] ?? (onlineSet.has(dm.partner.id) ? "online" : "offline"))
                 : "offline";
@@ -280,11 +310,15 @@ export function DmSidebar({
                     onClick={() => onSelectDm(dm.id)}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[15px] transition-colors",
+                      "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left text-[15px] transition-colors",
                       "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                      active
-                        ? "bg-foreground/10 font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                      mentioned
+                        ? "bg-primary/12 font-medium text-foreground"
+                        : unread > 0
+                          ? "font-medium text-foreground"
+                          : active
+                            ? "bg-foreground/10 font-medium text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                     )}
                   >
                     <Avatar
@@ -296,6 +330,18 @@ export function DmSidebar({
                       showStatus
                     />
                     <span className="truncate">{dm.partner?.display_name ?? "Unknown member"}</span>
+                    {unread > 0 ? (
+                      <span
+                        className={cn(
+                          "ml-auto shrink-0 rounded-full px-1.5 text-[10px] leading-4 font-bold tabular-nums",
+                          mentioned
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-foreground/15 text-foreground",
+                        )}
+                      >
+                        {unread > 99 ? "99+" : unread}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );

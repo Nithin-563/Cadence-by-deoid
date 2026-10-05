@@ -1,5 +1,5 @@
 import * as React from "react";
-import { MessageSquare, Plus } from "lucide-react";
+import { MessageSquare, Menu, Plus, Users } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import {
@@ -13,25 +13,34 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { usePresence, useTyping } from "@/hooks/usePresence";
 import {
+  markChannelRead,
   useDirectChannels,
   useFriendRequests,
   useMyServers,
   useServerChannels,
   useServerMembers,
+  useUnread,
   type DmChannel,
 } from "@/hooks/useCadenceData";
+import { useMessageSearch, usePins } from "@/hooks/useChatExtras";
 import { useMessages } from "@/hooks/useMessages";
 import { PERMISSIONS } from "@/lib/permissions";
 
 import { Rail } from "@/components/app/Rail";
 import { DmSidebar, ServerSidebar, UserPanel } from "@/components/app/Sidebar";
 import { Composer, MessageItem, formatDayDivider } from "@/components/app/Chat";
+import { PinsBar, SearchBar } from "@/components/app/ChatExtras";
 import { MemberList } from "@/components/app/MemberList";
 import { FriendsView } from "@/components/app/FriendsView";
 import { SettingsView } from "@/components/app/SettingsView";
 import { ServerSettings } from "@/components/app/ServerSettings";
 import { Avatar } from "@/components/app/Avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { FullPageLoader } from "@/components/app/AuthGate";
 import {
   CreateChannelDialog,
@@ -65,6 +74,11 @@ export function CadenceApp() {
   const [createChannelOpen, setCreateChannelOpen] = React.useState(false);
   const [profileTarget, setProfileTarget] = React.useState<Profile | null>(null);
 
+  // Mobile drawers
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [membersOpen, setMembersOpen] = React.useState(false);
+  const [pinsHidden, setPinsHidden] = React.useState(false);
+
   const activeServerId =
     view.kind === "channel" ? view.serverId : view.kind === "server-settings" ? view.serverId : null;
 
@@ -81,6 +95,31 @@ export function CadenceApp() {
   const messageApi = useMessages(activeChannelId);
   const pendingCount = useFriendRequests();
   const { typingIds, notifyTyping } = useTyping(activeChannelId, user?.id);
+
+  const unread = useUnread(server?.id ?? null, dms.map((dm) => dm.id), user?.id, profile?.username);
+  const pins = usePins(activeChannelId);
+  const search = useMessageSearch(
+    view.kind === "channel" && view.serverId ? activeChannelId : null,
+    view.kind === "channel" && !view.serverId ? null : (server?.id ?? null),
+  );
+
+  const pinnedIds = React.useMemo(
+    () => new Set(pins.pins.map((pin) => pin.message_id)),
+    [pins.pins],
+  );
+
+  // Opening a channel marks it read, which clears its badge.
+  React.useEffect(() => {
+    if (!activeChannelId || !user?.id) return;
+    void markChannelRead(activeChannelId, user.id);
+  }, [activeChannelId, user?.id]);
+
+  /** Scroll a specific message into view (pins, search results). */
+  const jumpToMessage = React.useCallback((messageId: string) => {
+    window.requestAnimationFrame(() => {
+      document.getElementById(messageId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
 
   /* ------------------------------------------------------- permissions --- */
 
@@ -271,85 +310,160 @@ export function CadenceApp() {
   // are defensive only — they must never strand the user on a blank screen.
   if (!user || !profile) return <FullPageLoader label="Opening Cadence…" />;
 
-  return (
-    <div className="flex h-dvh overflow-hidden bg-background">
-      <Rail
-        servers={servers}
-        activeServerId={server?.id ?? null}
-        unreadByServer={{}}
-        onSelectHome={() => setView({ kind: "home" })}
-        onSelectFriends={() => setView({ kind: "friends" })}
-        onSelectServer={selectServer}
-        onCreateServer={() => setCreateServerOpen(true)}
-        onJoinServer={() => setJoinServerOpen(true)}
-        onOpenProfile={() => setView({ kind: "settings" })}
-        profile={{ id: profile.id, display_name: profile.display_name, avatar_url: profile.avatar_url }}
-        status={presence[profile.id] ?? "online"}
-      />
+  const selectChannel = (id: string, targetServerId: string | null) => {
+    const channel = channels.find((c) => c.id === id);
+    const dm = dms.find((entry) => entry.id === id);
+    setView({
+      kind: "channel",
+      serverId: targetServerId,
+      channelId: id,
+      title: targetServerId ? (channel?.name ?? "channel") : (dm?.partner?.display_name ?? "Direct message"),
+    });
+    setSidebarOpen(false);
+  };
 
-      {/* Sidebar */}
-      <div className="flex w-60 shrink-0 flex-col">
-        {server ? (
-          <ServerSidebar
-            server={server}
-            channels={channels}
-            activeChannelId={activeChannelId}
-            canManageChannels={can("MANAGE_CHANNELS")}
-            onSelectChannel={(id) => {
-              const channel = channels.find((c) => c.id === id);
-              setView({
-                kind: "channel",
-                serverId: server.id,
-                channelId: id,
-                title: channel?.name ?? "channel",
-              });
-            }}
-            onCreateChannel={() => setCreateChannelOpen(true)}
-            onOpenSettings={() => setView({ kind: "server-settings", serverId: server.id })}
-            onInvite={() => setInviteOpen(true)}
-            onLeave={() => void leaveServer()}
-            onDeleteServer={() => void deleteServer()}
-            onToggleMembers={() => setMembersVisible((value) => !value)}
-            membersVisible={membersVisible}
-            onlineCount={members.filter((m) => (presence[m.id] ?? "offline") !== "offline").length}
-          />
-        ) : (
-          <DmSidebar
-            dms={dms}
-            friends={friends}
-            pendingCount={pendingCount}
-            onlineIds={onlineIds}
-            presence={presence}
-            activeChannelId={activeChannelId}
-            onSelectDm={(id) => {
-              const dm = dms.find((entry) => entry.id === id);
-              setView({
-                kind: "channel",
-                serverId: null,
-                channelId: id,
-                title: dm?.partner?.display_name ?? "Direct message",
-              });
-            }}
-            onSelectFriends={() => setView({ kind: "friends" })}
-            onOpenProfile={(userId) => void openUserProfile(userId)}
-          />
-        )}
-
-        <UserPanel
-          profile={{
-            id: profile.id,
-            display_name: profile.display_name,
-            username: profile.username,
-            avatar_url: profile.avatar_url,
+  /** Sidebar contents, rendered inline on desktop and in a sheet on mobile. */
+  const sidebar = (
+    <>
+      {server ? (
+        <ServerSidebar
+          server={server}
+          channels={channels}
+          activeChannelId={activeChannelId}
+          canManageChannels={can("MANAGE_CHANNELS")}
+          unreadCounts={unread.counts}
+          unreadMentions={unread.mentions}
+          onSelectChannel={(id) => selectChannel(id, server.id)}
+          onCreateChannel={() => {
+            setCreateChannelOpen(true);
+            setSidebarOpen(false);
           }}
-          status={presence[profile.id] ?? "online"}
-          onOpenSettings={() => setView({ kind: "settings" })}
-          onSignOut={() => void signOut()}
+          onOpenSettings={() => {
+            setView({ kind: "server-settings", serverId: server.id });
+            setSidebarOpen(false);
+          }}
+          onInvite={() => {
+            setInviteOpen(true);
+            setSidebarOpen(false);
+          }}
+          onLeave={() => void leaveServer()}
+          onDeleteServer={() => void deleteServer()}
+          onToggleMembers={() => setMembersVisible((value) => !value)}
+          membersVisible={membersVisible}
+          onlineCount={members.filter((m) => (presence[m.id] ?? "offline") !== "offline").length}
         />
+      ) : (
+        <DmSidebar
+          dms={dms}
+          friends={friends}
+          pendingCount={pendingCount}
+          onlineIds={onlineIds}
+          presence={presence}
+          unreadCounts={unread.counts}
+          unreadMentions={unread.mentions}
+          activeChannelId={activeChannelId}
+          onSelectDm={(id) => selectChannel(id, null)}
+          onSelectFriends={() => {
+            setView({ kind: "friends" });
+            setSidebarOpen(false);
+          }}
+          onOpenProfile={(userId) => void openUserProfile(userId)}
+        />
+      )}
+
+      <UserPanel
+        profile={{
+          id: profile.id,
+          display_name: profile.display_name,
+          username: profile.username,
+          avatar_url: profile.avatar_url,
+        }}
+        status={presence[profile.id] ?? "online"}
+        onOpenSettings={() => {
+          setView({ kind: "settings" });
+          setSidebarOpen(false);
+        }}
+        onSignOut={() => void signOut()}
+      />
+    </>
+  );
+
+  const memberList = server ? (
+    <MemberList
+      members={members}
+      roles={roles}
+      currentUserId={profile.id}
+      ownerId={server.owner_id}
+      basePermissions={basePermissions}
+      presence={presence}
+      onlineIds={onlineIds}
+      onOpenProfile={(userId) => void openUserProfile(userId)}
+      onOpenDm={(userId) => void openDm(userId)}
+      onKick={(userId) => void kickMember(userId)}
+      onBan={(userId) => void banMember(userId)}
+      onAddFriend={(userId) => void addFriend(userId)}
+    />
+  ) : null;
+
+  const railProps = {
+    servers,
+    activeServerId: server?.id ?? null,
+    onSelectHome: () => {
+      setView({ kind: "home" });
+      setSidebarOpen(false);
+    },
+    onSelectFriends: () => {
+      setView({ kind: "friends" });
+      setSidebarOpen(false);
+    },
+    onSelectServer: (id: string) => {
+      selectServer(id);
+      setSidebarOpen(false);
+    },
+    onCreateServer: () => {
+      setCreateServerOpen(true);
+      setSidebarOpen(false);
+    },
+    onJoinServer: () => {
+      setJoinServerOpen(true);
+      setSidebarOpen(false);
+    },
+    onOpenProfile: () => {
+      setView({ kind: "settings" });
+      setSidebarOpen(false);
+    },
+    profile: { id: profile.id, display_name: profile.display_name, avatar_url: profile.avatar_url },
+    status: (presence[profile.id] ?? "online") as PresenceStatus,
+  };
+
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
+      {/* Desktop rail */}
+      <div className="hidden md:flex">
+        <Rail {...railProps} orientation="vertical" unreadByServer={{ [server?.id ?? ""]: unread.serverTotal }} />
       </div>
 
+      {/* Desktop sidebar */}
+      <div className="hidden w-60 shrink-0 flex-col md:flex">{sidebar}</div>
+
+      {/* Mobile: channel / DM drawer */}
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" showCloseButton={false} className="w-[17.5rem] max-w-[85vw] gap-0 p-0 sm:max-w-[17.5rem]">
+          <SheetTitle className="sr-only">Servers and channels</SheetTitle>
+          <div className="flex h-full flex-col">{sidebar}</div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Mobile: member drawer */}
+      <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
+        <SheetContent side="right" className="w-[17rem] gap-0 p-0 sm:max-w-[17rem]">
+          <SheetTitle className="sr-only">Members</SheetTitle>
+          <div className="h-full overflow-y-auto">{memberList}</div>
+        </SheetContent>
+      </Sheet>
+
       {/* Main pane */}
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
         {view.kind === "home" ? (
           <HomePane
             servers={servers}
@@ -405,24 +519,85 @@ export function CadenceApp() {
 
         {view.kind === "channel" && activeChannelId ? (
           <>
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-4">
-              <span className="font-mono text-lg text-muted-foreground">
+            <header className="flex h-12 shrink-0 items-center gap-1.5 border-b border-border/70 px-2 sm:gap-2 sm:px-4">
+              {/* Hamburger — mobile only */}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0 md:hidden"
+                aria-label="Open channel list"
+                aria-expanded={sidebarOpen}
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="size-5" />
+              </Button>
+
+              <span className="hidden font-mono text-lg text-muted-foreground md:inline">
                 {view.serverId ? "#" : "@"}
               </span>
-              <h1 className="truncate text-[15px] font-semibold">
+              <h1 className="hidden min-w-0 truncate text-[15px] font-semibold md:block">
                 {view.title || "channel"}
               </h1>
+
+              {/* Compact channel title on mobile */}
+              <span className="flex min-w-0 items-center gap-1 truncate md:hidden">
+                <span className="font-mono text-muted-foreground">
+                  {view.serverId ? "#" : "@"}
+                </span>
+                <span className="truncate text-[15px] font-semibold">
+                  {view.title || "channel"}
+                </span>
+                {activeChannelId && unread.counts[activeChannelId] ? (
+                  <span className="flex min-w-4 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                    {unread.counts[activeChannelId] > 99 ? "99+" : unread.counts[activeChannelId]}
+                  </span>
+                ) : null}
+              </span>
+
               {server ? (
-                <span className="truncate border-l border-border pl-3 text-sm text-muted-foreground">
+                <span className="hidden min-w-0 truncate border-l border-border pl-3 text-sm text-muted-foreground md:block">
                   {channels.find((c) => c.id === activeChannelId)?.topic || "No topic set"}
                 </span>
               ) : null}
+
               {typingIds.length > 0 ? (
-                <span className="ml-auto truncate text-xs text-teal">
+                <span className="ml-auto hidden truncate text-xs text-teal lg:block">
                   {typingIds.length === 1 ? "Someone is typing…" : `${typingIds.length} people are typing…`}
                 </span>
               ) : null}
+
+              <div className="ml-auto flex items-center gap-0.5">
+                <SearchBar
+                  scopeLabel={view.title || "this channel"}
+                  query={search.query}
+                  onQueryChange={search.setQuery}
+                  hits={search.hits}
+                  searching={search.searching}
+                  onJump={jumpToMessage}
+                  onClose={search.reset}
+                />
+
+                {server ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="lg:hidden"
+                    aria-label="Toggle member list"
+                    aria-expanded={membersOpen}
+                    onClick={() => setMembersOpen((value) => !value)}
+                  >
+                    <Users className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
             </header>
+
+            {/* Typing indicator on small screens, where the header has no room */}
+            {typingIds.length > 0 ? (
+              <p className="shrink-0 px-3 pb-1 text-[11px] text-teal lg:hidden">
+                {typingIds.length === 1 ? "Someone is typing…" : `${typingIds.length} people are typing…`}
+              </p>
+            ) : null}
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               {!channelAllows("VIEW_CHANNEL") ? (
@@ -442,8 +617,10 @@ export function CadenceApp() {
                   reactions={messageApi.reactions}
                   profilesById={profilesById}
                   currentUserId={profile.id}
+                  currentUsername={profile.username}
                   canManageMessages={channelAllows("MANAGE_MESSAGES")}
                   canReact={channelAllows("ADD_REACTIONS")}
+                  pinnedIds={pinnedIds}
                   hasMore={messageApi.hasMore}
                   onLoadMore={() => void messageApi.loadMore()}
                   onReply={(message) => {
@@ -460,10 +637,19 @@ export function CadenceApp() {
                   }}
                   onDelete={(message) => void messageApi.remove(message.id)}
                   onReact={(messageId, emoji) => void messageApi.toggleReaction(messageId, emoji)}
+                  onTogglePin={(message) => void pins.togglePin(message)}
                   onOpenProfile={(userId) => void openUserProfile(userId)}
                 />
               )}
             </div>
+
+            <PinsBar
+              pins={pins.pins}
+              messages={messageApi.messages}
+              authors={profilesById}
+              onJump={jumpToMessage}
+              onClose={() => setPinsHidden((value) => !value)}
+            />
 
             <Composer
               disabled={!channelAllows("SEND_MESSAGES")}
@@ -492,24 +678,16 @@ export function CadenceApp() {
           </div>
         ) : null}
 
-        {/* Member list */}
+        {/* Desktop member list */}
         {server && membersVisible && view.kind !== "server-settings" ? (
-          <MemberList
-            members={members}
-            roles={roles}
-            currentUserId={profile.id}
-            ownerId={server.owner_id}
-            basePermissions={basePermissions}
-            presence={presence}
-            onlineIds={onlineIds}
-            onOpenProfile={(userId) => void openUserProfile(userId)}
-            onOpenDm={(userId) => void openDm(userId)}
-            onKick={(userId) => void kickMember(userId)}
-            onBan={(userId) => void banMember(userId)}
-            onAddFriend={(userId) => void addFriend(userId)}
-          />
+          <div className="hidden lg:flex">{memberList}</div>
         ) : null}
       </main>
+
+      {/* Mobile bottom navigation */}
+      <div className="shrink-0 md:hidden">
+        <Rail {...railProps} orientation="horizontal" unreadByServer={{}} />
+      </div>
 
       {/* Dialogs */}
       <CreateServerDialog
@@ -561,28 +739,34 @@ function MessageList({
   reactions,
   profilesById,
   currentUserId,
+  currentUsername,
   canManageMessages,
   canReact,
+  pinnedIds,
   hasMore,
   onLoadMore,
   onReply,
   onEdit,
   onDelete,
   onReact,
+  onTogglePin,
   onOpenProfile,
 }: {
   messages: Message[];
   reactions: Reaction[];
   profilesById: Map<string, Profile>;
   currentUserId: string;
+  currentUsername: string;
   canManageMessages: boolean;
   canReact: boolean;
+  pinnedIds: Set<string>;
   hasMore: boolean;
   onLoadMore: () => void;
   onReply: (message: Message) => void;
   onEdit: (message: Message) => void;
   onDelete: (message: Message) => void;
   onReact: (messageId: string, emoji: string) => void;
+  onTogglePin: (message: Message) => void;
   onOpenProfile: (userId: string) => void;
 }) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -658,12 +842,15 @@ function MessageList({
               replyAuthor={replyTo ? (profilesById.get(replyTo.author_id) ?? null) : null}
               reactions={reactions.filter((reaction) => reaction.message_id === message.id)}
               currentUserId={currentUserId}
+              currentUsername={currentUsername}
               canManage={canManageMessages}
               showHeader={!grouped}
+              pinned={pinnedIds.has(message.id)}
               onReply={onReply}
               onEdit={onEdit}
               onDelete={onDelete}
               onReact={canReact ? onReact : NOOP}
+              onTogglePin={onTogglePin}
               onOpenProfile={onOpenProfile}
             />
           </React.Fragment>

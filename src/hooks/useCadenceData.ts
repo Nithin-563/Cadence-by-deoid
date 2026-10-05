@@ -291,6 +291,149 @@ export function useServerMembers(serverId: string | null) {
   return { members: membersWithRoles, roles, memberRoles, loading, reload };
 }
 
+/* -------------------------------------------------------------- unread --- */
+
+export interface RecentMessage {
+  id: string;
+  channel_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+}
+
+export interface UnreadState {
+  /** Channel id -> messages since the user last opened it. */
+  counts: Record<string, number>;
+  /** Channels where the user was @mentioned after last reading. */
+  mentions: Set<string>;
+  /** Total unread in the server currently open (0 when no server is open). */
+  serverTotal: number;
+}
+
+/** Only look back a fortnight — older messages don't drive a badge. */
+const UNREAD_WINDOW_DAYS = 14;
+
+/**
+ * Unread counts and @mentions for the open server plus every DM.
+ *
+ * A channel that has never been opened has no `channel_reads` row, so we skip
+ * it — otherwise every badge would light up on first load.
+ */
+export function useUnread(
+  serverId: string | null,
+  dmChannelIds: string[],
+  myUserId: string | undefined,
+  myUsername: string | undefined,
+): UnreadState {
+  const [state, setState] = React.useState<UnreadState>({
+    counts: {},
+    mentions: new Set(),
+    serverTotal: 0,
+  });
+
+  const channelKey = dmChannelIds.join(",");
+  const mentionPattern = React.useMemo(
+    () => (myUsername ? new RegExp(`(^|\\s)@${escapeRegExp(myUsername)}\\b`, "i") : null),
+    [myUsername],
+  );
+
+  React.useEffect(() => {
+    if (!myUserId) {
+      setState({ counts: {}, mentions: new Set(), serverTotal: 0 });
+      return;
+    }
+
+    let active = true;
+
+    void (async () => {
+      const channelIds = [...dmChannelIds];
+
+      if (serverId) {
+        const { data } = await supabase
+          .from("channels")
+          .select("id")
+          .eq("server_id", serverId);
+        for (const channel of rows<{ id: string }>(data)) channelIds.push(channel.id);
+      }
+
+      if (channelIds.length === 0) {
+        if (active) setState({ counts: {}, mentions: new Set(), serverTotal: 0 });
+        return;
+      }
+
+      const since = new Date(
+        Date.now() - UNREAD_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+      ).toISOString();
+
+      const [readsResult, messagesResult] = await Promise.all([
+        supabase
+          .from("channel_reads")
+          .select("channel_id, last_read_at")
+          .eq("user_id", myUserId)
+          .in("channel_id", channelIds),
+        supabase
+          .from("messages")
+          .select("id, channel_id, author_id, content, created_at")
+          .in("channel_id", channelIds)
+          .gte("created_at", since)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: true })
+          .limit(2000),
+      ]);
+
+      if (!active) return;
+
+      const lastReadAt = new Map<string, string>();
+      for (const read of rows<{ channel_id: string; last_read_at: string }>(readsResult.data)) {
+        lastReadAt.set(read.channel_id, read.last_read_at);
+      }
+
+      const counts: Record<string, number> = {};
+      const mentions = new Set<string>();
+
+      for (const message of rows<RecentMessage>(messagesResult.data)) {
+        if (message.author_id === myUserId) continue;
+
+        const marker = lastReadAt.get(message.channel_id);
+        if (!marker || message.created_at <= marker) continue;
+
+        counts[message.channel_id] = (counts[message.channel_id] ?? 0) + 1;
+        if (mentionPattern?.test(message.content)) {
+          mentions.add(message.channel_id);
+        }
+      }
+
+      const serverTotal = Object.entries(counts).reduce((total, [channelId, count]) => {
+        // DMs live outside any server, so exclude them from the server badge.
+        if (dmChannelIds.includes(channelId)) return total;
+        return total + count;
+      }, 0);
+
+      setState({ counts, mentions, serverTotal });
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [serverId, channelKey, myUserId, mentionPattern]);
+
+  return state;
+}
+
+/** Record that the user has read a channel up to now. */
+export async function markChannelRead(channelId: string, userId: string) {
+  const { error } = await supabase.from("channel_reads").upsert({
+    channel_id: channelId,
+    user_id: userId,
+    last_read_at: new Date().toISOString(),
+  });
+  if (error) console.error("markChannelRead failed", error);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /* -------------------------------------------------------------- profile --- */
 
 /** Count of pending friend requests addressed to the current user. */

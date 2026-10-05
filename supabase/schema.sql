@@ -258,6 +258,16 @@ create table if not exists public.channel_reads (
   primary key (channel_id, user_id)
 );
 
+-- Messages pinned to a channel, shown in the pins bar.
+create table if not exists public.pins (
+  message_id uuid primary key references public.messages(id) on delete cascade,
+  channel_id uuid not null references public.channels(id) on delete cascade,
+  pinned_by  uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists pins_channel_idx on public.pins (channel_id, created_at desc);
+
 -- =============================================================================
 -- Social graph
 -- =============================================================================
@@ -601,6 +611,7 @@ alter table public.channel_overwrites enable row level security;
 alter table public.messages           enable row level security;
 alter table public.reactions          enable row level security;
 alter table public.channel_reads      enable row level security;
+alter table public.pins               enable row level security;
 alter table public.friendships        enable row level security;
 alter table public.user_blocks        enable row level security;
 
@@ -800,6 +811,27 @@ create policy reactions_insert on public.reactions
 drop policy if exists reactions_delete on public.reactions;
 create policy reactions_delete on public.reactions
   for delete using (user_id = auth.uid());
+
+-- pins ---------------------------------------------------------------------
+drop policy if exists pins_select on public.pins;
+create policy pins_select on public.pins
+  for select using (public.channel_permission(channel_id, auth.uid()) <> 0);
+
+drop policy if exists pins_insert on public.pins;
+create policy pins_insert on public.pins
+  for insert with check (
+    pinned_by = auth.uid()
+    and public.channel_permission(channel_id, auth.uid())
+        & public.perm_bit('MANAGE_MESSAGES') <> 0
+  );
+
+drop policy if exists pins_delete on public.pins;
+create policy pins_delete on public.pins
+  for delete using (
+    pinned_by = auth.uid()
+    or public.channel_permission(channel_id, auth.uid())
+       & public.perm_bit('MANAGE_MESSAGES') <> 0
+  );
 
 -- reads ---------------------------------------------------------------------
 drop policy if exists channel_reads_own on public.channel_reads;
