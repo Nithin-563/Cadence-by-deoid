@@ -18,7 +18,7 @@ export function PinsBar({
   onJump,
   onClose,
 }: {
-  pins: PinRow[];
+  pins: PinRow[] | undefined;
   messages: Message[];
   authors: Map<string, Profile>;
   onJump: (messageId: string) => void;
@@ -28,8 +28,6 @@ export function PinsBar({
     () => new Map(messages.map((message) => [message.id, message])),
     [messages],
   );
-
-  if (pins.length === 0) return null;
 
   return (
     <div className="flex items-center gap-2 border-t border-border/70 bg-gold-400/8 px-2 py-1.5 sm:px-3">

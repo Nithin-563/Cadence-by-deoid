@@ -781,7 +781,7 @@ export function CadenceApp() {
             </div>
 
             <PinsBar
-              pins={pinsHidden ? [] : pins.pins}
+              pins={pinsHidden ? [] : pins}
               messages={messageApi.messages}
               authors={profilesById}
               onJump={jumpToMessage}
