@@ -1,23 +1,12 @@
 import { useSeoMeta } from "@unhead/react";
-
-import { Nav } from "@/components/landing/Nav";
-import { Hero } from "@/components/landing/Hero";
-import { LogoCloud } from "@/components/landing/LogoCloud";
-import { Container, Reveal } from "@/components/landing/primitives";
-import { Features, CAPABILITIES } from "@/components/landing/Features";
-import { HowItWorks } from "@/components/landing/HowItWorks";
-import { CapabilityGrid } from "@/components/landing/ProductShowcase";
-import { Testimonials } from "@/components/landing/Testimonials";
-import { Pricing } from "@/components/landing/Pricing";
-import { Faq } from "@/components/landing/Faq";
-import { FinalCta, Footer } from "@/components/landing/Footer";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   useSeoMeta({
-    title: "Cadence — Self-hosted chat with servers, voice and roles",
+    title: "Cadence — Discord-style chat with servers and channels",
     description:
-      "A Discord-style chat app with servers, text and voice channels, roles, granular permissions, DMs and file sharing. Runs on a Supabase project you own — free and self-hostable.",
-    ogTitle: "Cadence — Self-hosted chat with servers, voice and roles",
+      "A Discord-style chat app with servers, text and voice channels, roles, granular permissions, DMs and file sharing. Runs on a Supabase project you own.",
+    ogTitle: "Cadence — Discord-style chat with servers and channels",
     ogDescription:
       "Servers, text and voice channels, roles and permissions, DMs and file sharing — on infrastructure you control.",
     ogType: "website",
@@ -33,36 +22,33 @@ const Index = () => {
         Skip to content
       </a>
 
-      <Nav />
-
-      <main id="main">
-        <Hero />
-        <LogoCloud />
-
-        <section className="border-b border-border/60 bg-muted/30 py-16 sm:py-20">
-          <Container wide>
-            <Reveal>
-              <h2 className="text-center text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                Everything included
-              </h2>
-            </Reveal>
-            <Reveal delay={80}>
-              <div className="mt-8">
-                <CapabilityGrid items={[...CAPABILITIES]} />
-              </div>
-            </Reveal>
-          </Container>
-        </section>
-
-        <Features />
-        <HowItWorks />
-        <Testimonials />
-        <Pricing />
-        <Faq />
-        <FinalCta />
+      <main id="main" className="flex flex-col items-center justify-center px-4 py-16">
+        <div className="w-full max-w-2xl text-center">
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+            Welcome to Cadence
+          </h1>
+          <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
+            Discord-style chat with servers, channels, roles, and permissions.
+          </p>
+          <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
+            <Link
+              to="/app"
+              className="rounded-full bg-foreground px-8 py-3 font-medium text-background transition-opacity hover:opacity-90"
+            >
+              Open Cadence
+            </Link>
+            <Link
+              to="/login"
+              className="rounded-full border border-border/80 bg-background px-8 py-3 font-medium text-foreground transition-colors hover:bg-muted/50"
+            >
+              Sign in
+            </Link>
+          </div>
+          <p className="mt-8 text-sm text-muted-foreground">
+            Your own Supabase project required. Free to use.
+          </p>
+        </div>
       </main>
-
-      <Footer />
     </div>
   );
 };

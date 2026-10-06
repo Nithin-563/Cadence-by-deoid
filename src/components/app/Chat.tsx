@@ -24,6 +24,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useMentionHighlight } from "@/hooks/useChatExtras";
+import { useSlashSuggestions, SlashPalette, CommandFeedback } from "./SlashCommands";
+import type { CommandResult } from "./SlashCommands";
 import type { Message, Profile, Reaction, Attachment } from "@/lib/database.types";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -181,6 +183,7 @@ export function MessageItem({
 
   const name = author?.display_name ?? "Unknown member";
   const isMine = message.author_id === currentUserId;
+  const pending = message.id.startsWith("pending-");
   const segments = useMentionHighlight(message.content, currentUsername);
 
   return (
@@ -189,6 +192,7 @@ export function MessageItem({
         "group relative px-3 py-0.5 transition-colors hover:bg-foreground/[0.03] sm:px-4",
         showHeader && "mt-3",
         pinned && "bg-gold-400/8",
+        pending && "opacity-60",
       )}
       id={message.id}
     >
@@ -223,7 +227,12 @@ export function MessageItem({
               >
                 {formatTime(message.created_at)}
               </time>
-              {message.edited_at ? (
+              {pending ? (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <Loader2 className="size-2.5 animate-spin" /> sending…
+                </span>
+              ) : null}
+              {!pending && message.edited_at ? (
                 <span className="text-[10px] text-muted-foreground/80">(edited)</span>
               ) : null}
               {pinned ? (
@@ -365,6 +374,8 @@ export interface ComposerProps {
   onCancelEdit: () => void;
   onSubmit: (content: string, attachments: Attachment[]) => void | Promise<void>;
   onTyping: () => void;
+  /** Runs a `/command`. Return a result to show feedback. */
+  onCommand?: (raw: string) => Promise<CommandResult>;
   /** Returns the uploaded attachment list, or null if cancelled/failed. */
   onPickFiles: (files: File[]) => Promise<Attachment[] | null>;
 }
@@ -386,15 +397,20 @@ export function Composer({
   onCancelEdit,
   onSubmit,
   onTyping,
+  onCommand,
   onPickFiles,
 }: ComposerProps) {
   const [value, setValue] = React.useState("");
   const [emojiOpen, setEmojiOpen] = React.useState(false);
   const [pending, setPending] = React.useState<Attachment[]>([]);
   const [fileError, setFileError] = React.useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [commandResult, setCommandResult] = React.useState<CommandResult | null>(null);
   const ref = React.useRef<HTMLTextAreaElement | null>(null);
   const fileRef = React.useRef<HTMLInputElement | null>(null);
   const isCoarsePointer = useCoarsePointer();
+
+  const suggestions = useSlashSuggestions(value);
 
   // Seed the field with the text being edited.
   React.useEffect(() => {
@@ -421,8 +437,25 @@ export function Composer({
     setPending([]);
   };
 
+  /** Enter/Tab completes the highlighted suggestion, or runs the command. */
+  const handleEnter = () => {
+    if (suggestions.length > 0) {
+      const chosen = suggestions[Math.min(activeIndex, suggestions.length - 1)];
+      setValue(`/${chosen.name} `);
+      setActiveIndex(0);
+      return;
+    }
+    if (value.startsWith("/") && onCommand) {
+      const raw = value;
+      setValue("");
+      setActiveIndex(0);
+      void onCommand(raw).then((result) => setCommandResult(result));
+      return;
+    }
+    submit();
+  };
+
   const handleFiles = async (list: FileList | null) => {
-    if (!list || list.length === 0) return;
     setFileError(null);
 
     const tooBig = list.length > 0 && list[0].size > MAX_ATTACHMENT_BYTES;
@@ -537,17 +570,34 @@ export function Composer({
           }}
         />
 
-        <Textarea
+         {commandResult ? (
+           <CommandFeedback
+             result={commandResult}
+             onDismiss={() => setCommandResult(null)}
+           />
+         ) : null}
+         <SlashPalette commands={suggestions} activeIndex={activeIndex} />
+
+         <Textarea
           ref={ref}
           value={value}
           onChange={(event) => {
             setValue(event.target.value);
+            setActiveIndex(0);
             onTyping();
           }}
           onKeyDown={(event) => {
+            if (suggestions.length > 0 && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+              event.preventDefault();
+              setActiveIndex((current) => {
+                const next = event.key === "ArrowDown" ? current + 1 : current - 1;
+                return (next + suggestions.length) % suggestions.length;
+              });
+              return;
+            }
             if (event.key === "Enter" && !event.shiftKey && !isCoarsePointer) {
               event.preventDefault();
-              submit();
+              handleEnter();
             }
             if (event.key === "Escape") {
               setEmojiOpen(false);

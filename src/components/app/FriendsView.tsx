@@ -126,6 +126,12 @@ export function FriendsView({
     onChanged();
   };
 
+  const declineRequest = async (friendship: Friendship) => {
+    await supabase.from("friendships").delete().eq("id", friendship.id);
+    await reloadFriendships();
+    onChanged();
+  };
+
   const removeFriend = async (friendship: Friendship) => {
     await supabase.from("friendships").delete().eq("id", friendship.id);
     await reloadFriendships();
@@ -274,7 +280,25 @@ export function FriendsView({
                 key={friendship.id}
                 friendship={friendship}
                 onAccept={() => void acceptRequest(friendship)}
-                onDecline={() => void removeFriend(friendship)}
+                onDecline={() => void declineRequest(friendship)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {!query.trim() && outgoing.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            Sent requests — {outgoing.length}
+          </h2>
+          <ul className="space-y-2">
+            {outgoing.map((friendship) => (
+              <IncomingRequest
+                key={friendship.id}
+                friendship={friendship}
+                onAccept={() => void declineRequest(friendship)}
+                onDecline={() => void declineRequest(friendship)}
               />
             ))}
           </ul>

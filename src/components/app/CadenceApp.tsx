@@ -31,6 +31,10 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { Rail } from "@/components/app/Rail";
 import { DmSidebar, ServerSidebar, UserPanel } from "@/components/app/Sidebar";
 import { Composer, MessageItem, formatDayDivider, uploadAttachments } from "@/components/app/Chat";
+import {
+  findCommand,
+  type CommandResult,
+} from "@/components/app/SlashCommands";
 import { PinsBar, SearchBar } from "@/components/app/ChatExtras";
 import { VoiceChannelList, VoiceError, VoiceStage } from "@/components/app/Voice";
 import { MemberList } from "@/components/app/MemberList";
@@ -100,7 +104,7 @@ export function CadenceApp() {
   const { typingIds, notifyTyping } = useTyping(activeChannelId, user?.id);
 
   const unread = useUnread(server?.id ?? null, dms.map((dm) => dm.id), user?.id, profile?.username);
-  const pins = usePins(activeChannelId);
+  const { pins, togglePin } = usePins(activeChannelId);
   const search = useMessageSearch(
     view.kind === "channel" && view.serverId ? activeChannelId : null,
     view.kind === "channel" && !view.serverId ? null : (server?.id ?? null),
@@ -770,7 +774,7 @@ export function CadenceApp() {
                   }}
                   onDelete={(message) => void messageApi.remove(message.id)}
                   onReact={(messageId, emoji) => void messageApi.toggleReaction(messageId, emoji)}
-                  onTogglePin={(message) => void pins.togglePin(message)}
+                  onTogglePin={(message) => void togglePin(message)}
                   onOpenProfile={(userId) => void openUserProfile(userId)}
                 />
               )}
@@ -831,6 +835,62 @@ export function CadenceApp() {
               onSubmit={onSubmit}
               onTyping={notifyTyping}
               onPickFiles={pickFiles}
+              onCommand={async (raw) => {
+                const command = findCommand(raw);
+                if (!command) return { ok: false, message: `Unknown command: ${raw}` };
+
+                const slashArgs = raw.slice(command.name.length + 1).trim();
+                const activeChannel =
+                  channels.find((c) => c.id === activeChannelId) ?? null;
+
+                const ctx = {
+                  channel: activeChannel,
+                  channelAllows: (p: string) => channelAllows(p),
+                  onClear: () => {
+                    /* no-op — reload the page to reset the view */
+                  },
+                  onKick: async (userId) => {
+                    const { error } = await supabase
+                      .from("server_members")
+                      .delete()
+                      .eq("server_id", server?.id)
+                      .eq("user_id", userId);
+                    if (error) throw error;
+                  },
+                  onBan: async (userId) => {
+                    const { error } = await supabase
+                      .from("server_members")
+                      .update({ status: "banned" })
+                      .eq("server_id", server?.id)
+                      .eq("user_id", userId);
+                    if (error) throw error;
+                  },
+                  onOpenProfileByName: async (name) => {
+                    const { data } = await supabase
+                      .from("profiles")
+                      .select("id")
+                      .or(
+                        `username=eq.${name},display_name=ilike.%${name}%`,
+                      )
+                      .maybeSingle();
+                    if (data) void openUserProfile(data.id);
+                  },
+                  resolveMember: async (query) => {
+                    const { data } = await supabase
+                      .from("profiles")
+                      .select("id, display_name")
+                      .or(
+                        `username=eq.${query},display_name=ilike.%${query}%`,
+                      )
+                      .maybeSingle();
+                    return data
+                      ? { id: data.id, display_name: data.display_name }
+                      : null;
+                  },
+                };
+
+                return command.run(slashArgs, ctx);
+              }}
             />
           </>
         ) : null}

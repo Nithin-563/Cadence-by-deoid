@@ -77,7 +77,7 @@ export function useServerChannels(serverId: string | null) {
   React.useEffect(() => {
     setLoading(true);
     void reload();
-  }, [reload]);
+}, [reload]);
 
   React.useEffect(() => {
     if (!serverId) return;
@@ -92,7 +92,11 @@ export function useServerChannels(serverId: string | null) {
     return () => void supabase.removeChannel(channel);
   }, [serverId, reload]);
 
-  return { channels, loading, reload };
+  const remove = React.useCallback(async (id: string) => {
+    await supabase.from("channels").delete().eq("id", id);
+  }, []);
+
+  return { channels, loading, reload, remove };
 }
 
 export interface DmChannel extends Channel {

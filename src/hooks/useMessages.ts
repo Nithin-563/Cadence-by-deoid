@@ -21,16 +21,67 @@ export function useMessages(channelId: string | null) {
 
   // Guards against a slow first page landing after we've already switched channel.
   const channelRef = React.useRef<string | null>(null);
+  // Lets the poll read the newest message without re-subscribing on every send.
+  const messagesRef = React.useRef<Message[]>([]);
+  messagesRef.current = messages;
 
-  const loadReactions = React.useCallback(async (ids: string[]) => {
-    if (ids.length === 0) {
-      setReactions([]);
-      return;
-    }
-    const { data, error } = await supabase.from("reactions").select("*").in("message_id", ids);
-    if (error) console.error("reactions failed", error);
-    setReactions(rows<Reaction>(data));
-  }, []);
+   const loadReactions = React.useCallback(async (ids: string[]) => {
+     if (ids.length === 0) {
+       setReactions([]);
+       return;
+     }
+     const { data, error } = await supabase.from("reactions").select("*").in("message_id", ids);
+     if (error) console.error("reactions failed", error);
+     setReactions(rows<Reaction>(data));
+   }, []);
+
+   // Reaction toggle function with proper state synchronization
+   const toggleReaction = React.useCallback(
+     async (messageId: string, emoji: string) => {
+       if (!user) return;
+       // Optimistic UI update to prevent flickering
+       const optimisticKey = `${messageId}-${emoji}`;
+       setReactions((current) => {
+         const existing = current.find((r) => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
+         if (existing) {
+           return current.filter((r) => r.message_id !== messageId || r.user_id !== user.id || r.emoji !== emoji);
+         } else {
+           return [...current, { message_id: messageId, user_id: user.id, emoji }];
+         }
+       });
+
+       try {
+         const existing = reactions.find((r) => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
+         if (existing) {
+           const { error } = await supabase
+             .from("reactions")
+             .delete()
+             .eq("message_id", messageId)
+             .eq("user_id", user.id)
+             .eq("emoji", emoji);
+           if (error) {
+             console.error("unreact failed", error);
+             // Rollback optimistic update
+             setReactions((current) => current.filter((r) => !(r.message_id === messageId && r.user_id === user.id && r.emoji === emoji)));
+           }
+         } else {
+           const { error } = await supabase
+             .from("reactions")
+             .insert({ message_id: messageId, user_id: user.id, emoji });
+           if (error) {
+             console.error("react failed", error);
+             // Rollback optimistic update
+             setReactions((current) => current.filter((r) => !(r.message_id === messageId && r.user_id === user.id && r.emoji === emoji)));
+           }
+         }
+       } catch (error) {
+         console.error("reaction error", error);
+         // Rollback optimistic update on error
+         setReactions((current) => current.filter((r) => !(r.message_id === messageId && r.user_id === user.id && r.emoji === emoji)));
+       }
+     },
+     [user, reactions, setReactions],
+   );
 
   const fetchPage = React.useCallback(
     async (target: string, before?: string) => {
@@ -86,8 +137,21 @@ export function useMessages(channelId: string | null) {
   }, [channelId, fetchPage, loadReactions]);
 
   // Realtime: append new messages, patch edits, drop deletions.
+  //
+  // Realtime is the fast path, not the only path. Two things make this
+  // resilient rather than fragile:
+  //   1. realtimeStatus is tracked so the UI can show when it's degraded
+  //   2. a poll below guarantees new messages still arrive if the socket
+  //      doesn't (blocked WebSocket, corporate proxy, asleep tab)
+  const [realtimeStatus, setRealtimeStatus] = React.useState<
+    "connecting" | "live" | "polling" | "offline"
+  >("connecting");
+
   React.useEffect(() => {
-    if (!channelId || !user) return;
+    if (!channelId || !user) {
+      setRealtimeStatus("offline");
+      return;
+    }
 
     const channel = supabase
       .channel(`cadence:messages:${channelId}`)
@@ -115,7 +179,7 @@ export function useMessages(channelId: string | null) {
           setMessages((current) =>
             updated.deleted_at
               ? current.filter((m) => m.id !== updated.id)
-              : current.map((m) => (m.id === updated.id ? updated : m)),
+              : current.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)),
           );
         },
       )
@@ -138,10 +202,66 @@ export function useMessages(channelId: string | null) {
           });
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setRealtimeStatus("live");
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setRealtimeStatus("polling");
+        }
+      });
 
     return () => void supabase.removeChannel(channel);
   }, [channelId, user, loadReactions]);
+
+  /* --------------------------------------------------------------- poll --- */
+  // Safety net. If the socket is blocked or the tab was asleep, this picks up
+  // anything that arrived while we weren't listening.
+  React.useEffect(() => {
+    if (!channelId || !user) return;
+
+    let cancelled = false;
+
+    const tick = async () => {
+      const latest = messagesRef.current[messagesRef.current.length - 1];
+      if (!latest) return;
+
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("channel_id", channelId)
+        .is("deleted_at", null)
+        .gt("created_at", latest.created_at)
+        .order("created_at", { ascending: true })
+        .limit(100);
+
+      if (cancelled || error) return;
+      const fresh = rows<Message>(data);
+      if (fresh.length === 0) return;
+
+      setMessages((current) => {
+        const seen = new Set(current.map((m) => m.id));
+        const additions = fresh.filter((m) => !seen.has(m.id));
+        if (additions.length === 0) return current;
+        return [...current, ...additions].sort((a, b) =>
+          a.created_at.localeCompare(b.created_at),
+        );
+      });
+    };
+
+    const interval = window.setInterval(tick, 4000);
+    // Also fire when the tab comes back to the foreground.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onVisible);
+    };
+  }, [channelId, user]);
 
   // Opening a channel, or receiving into it, clears the unread marker.
   React.useEffect(() => {
@@ -181,20 +301,43 @@ export function useMessages(channelId: string | null) {
       const trimmed = content.trim();
       if (!trimmed && (!attachments || attachments.length === 0)) return;
 
-      setSending(true);
-      const { error } = await supabase.from("messages").insert({
+      // Optimistic echo: show it immediately with a client id, then swap in
+      // the real row. Waiting for the round trip is what made sending feel
+      // broken even when it worked.
+      const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const optimistic: Message = {
+        id: tempId,
         channel_id: channelId,
         author_id: user.id,
         content: trimmed,
         reply_to: replyTo ?? null,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
         attachments: attachments ?? [],
-      });
+      };
+
+      setMessages((current) => [...current, optimistic]);
+      setSending(true);
+
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          channel_id: channelId,
+          author_id: user.id,
+          content: trimmed,
+          reply_to: replyTo ?? null,
+          attachments: attachments ?? [],
+        })
+        .select()
+        .single();
+
       setSending(false);
 
-      // Rethrow so the composer can show it — a failed send that only logs to
-      // the console is indistinguishable from Send doing nothing.
       if (error) {
         console.error("send failed", error);
+        setMessages((current) => current.filter((m) => m.id !== tempId));
+
         const text = `${error.message} ${error.code ?? ""}`.toLowerCase();
         if (text.includes("row-level security") || error.code === "42501") {
           throw new Error(
@@ -208,6 +351,19 @@ export function useMessages(channelId: string | null) {
         }
         throw new Error(`Couldn't send: ${error.message}`);
       }
+
+      // Replace the placeholder with the row the database actually stored.
+      const saved = row<Message>(data);
+      setMessages((current) => {
+        const withoutTemp = current.filter((m) => m.id !== tempId);
+        if (saved) {
+          const exists = withoutTemp.some((m) => m.id === saved.id);
+          return exists
+            ? withoutTemp
+            : [...withoutTemp, saved].sort((a, b) => a.created_at.localeCompare(b.created_at));
+        }
+        return withoutTemp;
+      });
     },
     [channelId, user],
   );
@@ -232,38 +388,13 @@ export function useMessages(channelId: string | null) {
     if (error) console.error("delete failed", error);
   }, []);
 
-  const toggleReaction = React.useCallback(
-    async (messageId: string, emoji: string) => {
-      if (!user) return;
-      const existing = reactions.find(
-        (r) => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji,
-      );
-
-      if (existing) {
-        const { error } = await supabase
-          .from("reactions")
-          .delete()
-          .eq("message_id", messageId)
-          .eq("user_id", user.id)
-          .eq("emoji", emoji);
-        if (error) console.error("unreact failed", error);
-        return;
-      }
-
-      const { error } = await supabase
-        .from("reactions")
-        .insert({ message_id: messageId, user_id: user.id, emoji });
-      if (error) console.error("react failed", error);
-    },
-    [reactions, user],
-  );
-
   return {
     messages,
     reactions,
     loading,
     hasMore,
     sending,
+    realtimeStatus,
     loadMore,
     send,
     edit,

@@ -40,7 +40,7 @@ export function usePins(channelId: string | null) {
       }
       await reload();
     },
-    [pins, reload],
+    [reload],
   );
 
   return { pins, togglePin, reload };
@@ -63,6 +63,25 @@ export function useMessageSearch(channelId: string | null, serverId: string | nu
     setQuery("");
     setHits([]);
     setSearching(false);
+  }, []);
+
+  const profilesById = React.useRef<Map<string, Profile>>(new Map());
+
+  const loadProfiles = React.useCallback(async (authorIds: string[]) => {
+    if (authorIds.length === 0) return;
+
+    const existingIds = new Set(profilesById.current.keys());
+    const missingIds = authorIds.filter((id) => !existingIds.has(id));
+
+    if (missingIds.length === 0) return;
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("id, username, display_name, about, avatar_url, banner_url, status_text, created_at, updated_at")
+      .in("id", missingIds);
+    for (const profile of rows<Profile>(profileData)) {
+      profilesById.current.set(profile.id, profile);
+    }
   }, []);
 
   React.useEffect(() => {
@@ -112,18 +131,11 @@ export function useMessageSearch(channelId: string | null, serverId: string | nu
 
       const messages = rows<Message>(data);
       const authorIds = [...new Set(messages.map((message) => message.author_id))];
-      const authors = new Map<string, Profile>();
 
-      if (authorIds.length > 0) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("id, username, display_name, about, avatar_url, banner_url, status_text, created_at, updated_at")
-          .in("id", authorIds);
-        for (const profile of rows<Profile>(profileData)) authors.set(profile.id, profile);
-      }
+      await loadProfiles(authorIds);
 
       if (!active) return;
-      setHits(messages.map((message) => ({ ...message, author: authors.get(message.author_id) ?? null })));
+      setHits(messages.map((message) => ({ ...message, author: profilesById.current.get(message.author_id) ?? null })));
       setSearching(false);
     }, 300);
 
@@ -131,7 +143,7 @@ export function useMessageSearch(channelId: string | null, serverId: string | nu
       active = false;
       window.clearTimeout(handle);
     };
-  }, [query, channelId, serverId]);
+  }, [query, channelId, serverId, loadProfiles]);
 
   return { query, setQuery, hits, searching, reset };
 }
