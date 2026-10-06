@@ -24,10 +24,19 @@ export function PinsBar({
   onJump: (messageId: string) => void;
   onClose: () => void;
 }) {
+  // Defensive check for undefined pins - handle all possible edge cases
+  if (typeof pins === 'undefined' || !pins) return null;
+  
+  // Early return if no pins or pins is not an array
+  if (!Array.isArray(pins) || !pins.length) return null;
+
   const byId = React.useMemo(
     () => new Map(messages.map((message) => [message.id, message])),
     [messages],
   );
+
+  // Additional defensive check before calling pins.map()
+  if (!pins || !Array.isArray(pins)) return null;
 
   return (
     <div className="flex items-center gap-2 border-t border-border/70 bg-gold-400/8 px-2 py-1.5 sm:px-3">
