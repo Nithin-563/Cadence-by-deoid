@@ -111,8 +111,8 @@ export function CadenceApp() {
   );
 
   const pinnedIds = React.useMemo(
-    () => new Set(pins.pins.map((pin) => pin.message_id)),
-    [pins.pins],
+    () => new Set(pins.map((pin) => pin.message_id)),
+    [pins],
   );
 
   /* ------------------------------------------------------------- voice --- */
